@@ -46,3 +46,7 @@ backup-before-restore/
 temp-restore-check/
 *_files/
 *.download
+
+# runtime data (production mode: persist on host, do not track in git)
+prisma/dev.db
+public/uploads/

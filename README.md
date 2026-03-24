@@ -109,8 +109,10 @@ docker compose up -d --build
 
 ### 说明
 
-- `prisma/dev.db` 和 `public/uploads` 已挂载为宿主机目录，重启容器不会丢数据。
-- 若你要迁移“账号密码、菜单、图片”，请确保这两个路径在 Git 中已推送并拉取到目标服务器。
+- 生产模式下，数据库与上传目录通过宿主机挂载持久化：
+  - `./prisma:/app/prisma`
+  - `./public/uploads:/app/public/uploads`
+- 这两个目录属于运行数据，不建议再通过 Git 传输与合并。
 - 容器内数据库连接使用绝对路径：`file:/app/prisma/dev.db`，可避免某些环境下相对路径导致的“Unable to open the database file”。
 - 后台登录 cookie 的 `Secure` 开关由 `ADMIN_SESSION_SECURE` 控制；HTTP 内网访问请设为 `false`，HTTPS 域名访问可设为 `true`。
 
@@ -126,3 +128,51 @@ docker compose down
 # 仅重启服务
 docker compose restart
 ```
+
+## 生产可用模式（推荐）
+
+### 原则
+
+- Git 仅存放代码与配置
+- 运行数据（`prisma/dev.db`、`public/uploads`）不进 Git
+- 通过备份脚本保障可恢复
+
+### 升级与发布
+
+```bash
+bash scripts/deploy-update.sh /home/ethan/docker/friends-menu main
+```
+
+### 数据备份
+
+```bash
+bash scripts/backup-data.sh /home/ethan/docker/friends-menu /home/ethan/docker/friends-menu/backups
+```
+
+### 数据恢复
+
+```bash
+bash scripts/restore-data.sh /home/ethan/docker/friends-menu /home/ethan/docker/friends-menu/backups/20260324-120000
+docker compose up -d
+```
+
+## 服务器迁移与冲突恢复指南
+
+如果服务器历史上把 `prisma/dev.db` 也纳入了 Git，遇到 `needs merge` 时，先执行：
+
+```bash
+git merge --abort 2>/dev/null || true
+git reset --hard HEAD
+git pull
+```
+
+若仍提示 `prisma/dev.db: needs merge`，可先用本地版本解冲突：
+
+```bash
+git checkout --ours prisma/dev.db
+git add prisma/dev.db
+git commit -m "resolve sqlite merge conflict"
+git pull
+```
+
+之后改为本 README 的生产模式，避免再次发生二进制冲突。
