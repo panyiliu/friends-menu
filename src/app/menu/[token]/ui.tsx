@@ -373,8 +373,8 @@ export default function GuestMenuClient({ token }: { token: string }) {
       `}</style>
 
       <div className="relative mx-auto max-w-7xl px-4 py-5 sm:px-6 md:py-8 lg:px-8">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
+        <div className="mb-8 flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1 pr-2">
             <div className="mb-1 flex items-center gap-2">
               <div className="h-8 w-2 rounded-full bg-gradient-to-b from-orange-400 to-amber-500" />
               <h1 className="bg-gradient-to-r from-stone-800 via-amber-800 to-orange-700 bg-clip-text text-3xl font-bold tracking-tight text-transparent md:text-4xl">
@@ -385,16 +385,24 @@ export default function GuestMenuClient({ token }: { token: string }) {
           </div>
           <Link
             href={`/menu/${token}/my`}
-            className="group flex items-center gap-2 rounded-full border border-stone-200/80 bg-white/60 px-4 py-2 text-sm font-medium text-stone-600 backdrop-blur-sm transition-all duration-300 hover:border-amber-300 hover:bg-white hover:shadow-md"
+            className="group shrink-0 rounded-full border border-stone-200/80 bg-white/70 px-3 py-1.5 text-sm font-medium text-stone-600 backdrop-blur-sm transition-all duration-300 hover:border-amber-300 hover:bg-white hover:shadow-md sm:px-4 sm:py-2"
           >
             <span>我的订单</span>
           </Link>
         </div>
 
         {uiConfig.guestBannerUrl ? (
-          <div className="mb-6 overflow-hidden rounded-3xl border border-amber-100/80 bg-white/60 shadow-sm">
-            <div className="relative h-36 w-full sm:h-44">
-              <Image src={uiConfig.guestBannerUrl} alt="banner" fill sizes="100vw" className="object-cover" />
+          <div className="relative mb-6 overflow-hidden rounded-3xl border border-amber-100/80 bg-white/60 shadow-sm">
+            <div className="absolute inset-0">
+              <Image src={uiConfig.guestBannerUrl} alt="banner" fill sizes="100vw" loading="eager" className="object-cover" />
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-r from-white/80 via-white/55 to-white/35" />
+            <div className="relative h-36 w-full sm:h-44" />
+          </div>
+        ) : null}
+        {!uiConfig.guestBannerUrl ? (
+          <div className="mb-6 overflow-hidden rounded-3xl border border-amber-100/80 bg-gradient-to-r from-orange-100/70 via-amber-100/60 to-white shadow-sm">
+            <div className="h-20 w-full sm:h-24">
             </div>
           </div>
         ) : null}

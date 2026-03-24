@@ -138,6 +138,8 @@ export default function AdminPage() {
   const [isSavingDish, setIsSavingDish] = useState(false);
   const [isDeletingDish, setIsDeletingDish] = useState(false);
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
+  const [showPrimaryInviteCard, setShowPrimaryInviteCard] = useState(false);
+  const [showLowFrequencySettings, setShowLowFrequencySettings] = useState(false);
 
   const statusText = (status: Order["status"]) => (status === "PENDING" ? "待备餐" : status === "PREPARING" ? "备餐中" : "已完成");
   const inviteLink = useMemo(() => (invite?.token ? `${globalThis.location?.origin || ""}/menu/${invite.token}` : ""), [invite]);
@@ -1014,11 +1016,18 @@ export default function AdminPage() {
         <section className="mt-4 grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm md:col-span-2">
             <h2 className="font-semibold">点餐链接管理</h2>
-            <p className="mt-1 text-xs text-gray-500">主链接用于默认分享入口；新建链接可分别给不同点餐人使用。</p>
+            <p className="mt-1 text-xs text-gray-500">模板支持变量：<code>{"{{friendName}}"}</code>，会自动替换为该链接的朋友姓名。</p>
 
             <div className="mt-3 grid gap-4 md:grid-cols-2">
               <div>
-                <h3 className="font-semibold">主链接</h3>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="font-semibold">主链接（低频）</h3>
+                  <button type="button" className="rounded border px-2 py-0.5 text-xs" onClick={() => setShowPrimaryInviteCard((v) => !v)}>
+                    {showPrimaryInviteCard ? "隐藏" : "显示"}
+                  </button>
+                </div>
+                {showPrimaryInviteCard ? (
+                  <>
                 <p className="mt-2 text-sm font-medium">{invite?.label || "未命名主链接"}</p>
                 <p className="mt-1 text-xs text-gray-600">
                   {invite?.expiresAt
@@ -1069,6 +1078,8 @@ export default function AdminPage() {
                     </button>
                   ) : null}
                 </div>
+                  </>
+                ) : null}
               </div>
 
               <div>
@@ -1092,6 +1103,7 @@ export default function AdminPage() {
                 <details className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-2">
                   <summary className="cursor-pointer text-sm font-medium text-zinc-700">欢迎模板配置</summary>
                   <div className="mt-2 space-y-2">
+                    <p className="text-[11px] text-zinc-500">变量示例：欢迎你，{"{{friendName}}"}</p>
                     <label className="flex items-center gap-2 text-xs text-zinc-700">
                       <input
                         type="checkbox"
@@ -1240,6 +1252,14 @@ export default function AdminPage() {
           </div>
           <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
             <h2 className="font-semibold">系统设置</h2>
+            <button
+              type="button"
+              className="mt-2 flex w-full items-center justify-between rounded-xl border border-zinc-200 px-3 py-2 text-left text-sm hover:bg-zinc-50"
+              onClick={() => setShowLowFrequencySettings((v) => !v)}
+            >
+              <span className="font-medium">低频区（邮件与密码）</span>
+              <span className="text-xs text-zinc-500">{showLowFrequencySettings ? "收起" : "展开"}</span>
+            </button>
             <label className="mt-2 block text-sm">系统名称</label>
             <input
               className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2"
@@ -1319,6 +1339,19 @@ export default function AdminPage() {
               >
                 上传
               </button>
+              {settings.guestBannerUrl ? (
+                <button
+                  type="button"
+                  className="rounded-xl border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                  onClick={() => {
+                    setSettings((prev) => ({ ...prev, guestBannerUrl: "" }));
+                    setIsEditingSettings(true);
+                    setMessage("Banner 已删除，请点击“保存系统设置”生效");
+                  }}
+                >
+                  删除
+                </button>
+              ) : null}
             </div>
             {settings.guestBannerUrl ? (
               <div className="mt-2 overflow-hidden rounded-xl border border-zinc-200">
@@ -1327,7 +1360,7 @@ export default function AdminPage() {
                 </div>
               </div>
             ) : null}
-            <div className="mt-2">
+            <div className={`mt-2 ${showLowFrequencySettings ? "" : "hidden"}`}>
               <button
                 type="button"
                 className="flex w-full items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-left text-sm hover:bg-zinc-50"
@@ -1397,7 +1430,7 @@ export default function AdminPage() {
               </button>
             </div>
           </div>
-          <form className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm" action={changePassword}>
+          <form className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${showLowFrequencySettings ? "" : "hidden"}`} action={changePassword}>
             <h2 className="font-semibold">修改后台密码</h2>
             <input className="mt-2 w-full rounded-xl border border-zinc-200 px-3 py-2" name="oldPassword" type="password" placeholder="旧密码" />
             <input className="mt-2 w-full rounded-xl border border-zinc-200 px-3 py-2" name="newPassword" type="password" placeholder="新密码" />
