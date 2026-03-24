@@ -134,6 +134,7 @@ export default function AdminPage() {
   const [isOrderMultiSelect, setIsOrderMultiSelect] = useState(false);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const drawerFileInputRef = useRef<HTMLInputElement | null>(null);
+  const restoreZipInputRef = useRef<HTMLInputElement | null>(null);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [isSavingDish, setIsSavingDish] = useState(false);
   const [isDeletingDish, setIsDeletingDish] = useState(false);
@@ -224,8 +225,13 @@ export default function AdminPage() {
   async function uploadImage(file: File) {
     const fd = new FormData();
     fd.set("file", file);
-    const up = await fetch("/api/admin/upload", { method: "POST", body: fd }).then((r) => r.json());
-    return up.ok ? String(up.url) : "";
+    const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+    const up = await safeJson(res);
+    if (!up.ok) {
+      setMessage(up.message || "图片上传失败");
+      return "";
+    }
+    return String(up.url || "");
   }
 
   async function saveDish(dish: Dish, file?: File | null) {
@@ -235,6 +241,10 @@ export default function AdminPage() {
     body.tags = String(body.tags || "").split(",")[0]?.trim() || "";
     if (file && file.size > 0) {
       const imageUrl = await uploadImage(file);
+      if (!imageUrl) {
+        setIsSavingDish(false);
+        return;
+      }
       body.imageAction = "replace";
       body.imageUrl = imageUrl;
     }
@@ -420,6 +430,40 @@ export default function AdminPage() {
       d = { ok: false, message: "测试邮件接口返回异常" };
     }
     setMessage(d.message || (d.ok ? "测试邮件发送成功" : "测试邮件发送失败"));
+  }
+
+  async function exportMenuBackupZip() {
+    const res = await fetch("/api/admin/backup-menu");
+    if (!res.ok) {
+      const d = await safeJson(res);
+      setMessage(d.message || "导出备份失败");
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `menu-backup-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setMessage("菜单备份 ZIP 已导出");
+  }
+
+  async function importMenuBackupZip(file: File) {
+    if (!file) return;
+    if (!confirm("确认恢复这个 ZIP 备份吗？将按“分类+菜名”覆盖同名菜品并替换其图片。")) return;
+    const fd = new FormData();
+    fd.set("file", file);
+    const res = await fetch("/api/admin/backup-menu", { method: "POST", body: fd });
+    const d = await safeJson(res);
+    if (d.ok) {
+      setMessage(`恢复完成：已处理 ${d.imported || 0} 道菜，导入 ${d.imageCount || 0} 张图片`);
+      await refresh(false);
+    } else {
+      setMessage(d.message || "恢复失败");
+    }
   }
 
   async function cleanupUnusedTags() {
@@ -1446,6 +1490,30 @@ export default function AdminPage() {
               <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={sendTestMail}>
                 发送测试邮件
               </button>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-3">
+              <h3 className="text-sm font-semibold">菜单数据备份/恢复（ZIP）</h3>
+              <p className="mt-1 text-xs text-zinc-500">导出格式：每道菜一个文件夹，内含 `dish.json` 和图片文件；可直接用于一键恢复。</p>
+              <input
+                ref={restoreZipInputRef}
+                type="file"
+                accept=".zip,application/zip"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void importMenuBackupZip(file);
+                  e.currentTarget.value = "";
+                }}
+              />
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={() => void exportMenuBackupZip()}>
+                  一键备份 ZIP
+                </button>
+                <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={() => restoreZipInputRef.current?.click()}>
+                  一键恢复 ZIP
+                </button>
+              </div>
             </div>
 
             <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
