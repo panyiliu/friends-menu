@@ -115,6 +115,20 @@ docker compose up -d --build
 - 这两个目录属于运行数据，不建议再通过 Git 传输与合并。
 - 容器内数据库连接使用绝对路径：`file:/app/prisma/dev.db`，可避免某些环境下相对路径导致的“Unable to open the database file”。
 - 后台登录 cookie 的 `Secure` 开关由 `ADMIN_SESSION_SECURE` 控制；HTTP 内网访问请设为 `false`，HTTPS 域名访问可设为 `true`。
+- 公网部署建议使用独立反向代理（Nginx/Caddy）终止 HTTPS，并将 `ADMIN_SESSION_SECURE=true`。
+- 健康检查接口：`/api/health`（建议配置到反代或容器探活）。
+
+### 生产环境必设变量（公网）
+
+```bash
+ADMIN_SESSION_SECRET=请替换为至少24位随机串
+ADMIN_SESSION_SECURE=true
+DATABASE_URL=file:/app/prisma/dev.db
+```
+
+说明：
+- 生产模式下若 `ADMIN_SESSION_SECRET` 过短/默认值，服务会拒绝启动。
+- 生产模式下要求 `ADMIN_SESSION_SECURE=true`，避免后台 Cookie 在 HTTP 明文传输。
 
 ### 常用命令
 
@@ -143,6 +157,12 @@ docker compose restart
 bash scripts/deploy-update.sh /home/ethan/docker/friends-menu main
 ```
 
+发布脚本会输出回滚指令（含前一版本 SHA），如：
+
+```bash
+bash scripts/rollback-release.sh /home/ethan/docker/friends-menu <prev_sha>
+```
+
 ### 数据备份
 
 ```bash
@@ -155,6 +175,11 @@ bash scripts/backup-data.sh /home/ethan/docker/friends-menu /home/ethan/docker/f
 bash scripts/restore-data.sh /home/ethan/docker/friends-menu /home/ethan/docker/friends-menu/backups/20260324-120000
 docker compose up -d
 ```
+
+后台“设置 -> 系统设置”中也提供 ZIP 备份/恢复：
+- 一键备份 ZIP
+- 预检恢复 ZIP（dry-run，不落库）
+- 一键恢复 ZIP（实际写入）
 
 ## 服务器迁移与冲突恢复指南
 
@@ -176,3 +201,10 @@ git pull
 ```
 
 之后改为本 README 的生产模式，避免再次发生二进制冲突。
+
+## 安全基线（公网）
+
+- 禁用默认后台密码：生产环境会阻止 `admin/admin123456` 登录。
+- 登录防爆破：登录接口启用 IP + 账号维度限流。
+- 管理端 API 限流：`/api/admin/*` 在网关层和应用层均建议开启限流。
+- 日志落盘：应用运行日志写入 `logs/app.log`（JSON 行格式）。

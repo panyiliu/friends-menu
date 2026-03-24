@@ -1,4 +1,5 @@
 import { ensureAdmin } from "@/lib/api-auth";
+import { logError, logInfo } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import JSZip from "jszip";
 import { promises as fs } from "fs";
@@ -64,7 +65,10 @@ export async function GET(req: NextRequest) {
       for (const image of dish.images) {
         const relPath = String(image.url || "");
         if (!relPath.startsWith("/")) continue;
-        const fsPath = path.join(publicDir, relPath.replace(/^\//, ""));
+        const normalized = relPath.startsWith("/api/uploads/")
+          ? `/uploads/${decodeURIComponent(relPath.replace("/api/uploads/", ""))}`
+          : relPath;
+        const fsPath = path.join(publicDir, normalized.replace(/^\//, ""));
         try {
           const fileBuf = await fs.readFile(fsPath);
           const fileName = path.basename(fsPath);
@@ -94,7 +98,7 @@ export async function GET(req: NextRequest) {
     }
 
     const buffer = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } });
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type": "application/zip",
@@ -111,6 +115,8 @@ export async function POST(req: NextRequest) {
   if (!ensureAdmin(req)) return NextResponse.json({ ok: false }, { status: 401 });
   try {
     const form = await req.formData();
+    const mode = String(form.get("mode") || "apply").toLowerCase();
+    const dryRun = mode === "dry-run";
     const zipFile = form.get("file");
     if (!(zipFile instanceof File)) {
       return NextResponse.json({ ok: false, message: "请上传 ZIP 文件" }, { status: 400 });
@@ -130,78 +136,95 @@ export async function POST(req: NextRequest) {
 
     let imported = 0;
     let imageCount = 0;
+    const warnings: string[] = [];
     for (const entry of dishEntries) {
       if (entry.dir) continue;
       const dir = entry.name.split("/").slice(0, -1).join("/");
       const raw = await entry.async("string");
-      const meta = JSON.parse(raw) as Partial<BackupDish>;
+      let meta: Partial<BackupDish>;
+      try {
+        meta = JSON.parse(raw) as Partial<BackupDish>;
+      } catch {
+        warnings.push(`无效JSON: ${entry.name}`);
+        continue;
+      }
       const categoryName = String(meta.categoryName || "").trim() || "未分类";
-      const existedCategory = await prisma.category.findFirst({ where: { name: categoryName } });
-      const category = existedCategory
-        ? await prisma.category.update({
-            where: { id: existedCategory.id },
-            data: { sortOrder: Number(meta.categorySortOrder || existedCategory.sortOrder || 0), isEnabled: true },
-          })
-        : await prisma.category.create({
-            data: {
-              name: categoryName,
-              sortOrder: Number(meta.categorySortOrder || 0),
-              isEnabled: true,
-            },
-          });
 
       const name = String(meta.name || "").trim();
       if (!name) continue;
-      const dishData = {
-        name,
-        englishName: String(meta.englishName || ""),
-        tags: String(meta.tags || ""),
-        description: String(meta.description || ""),
-        method: String(meta.method || ""),
-        ingredients: String(meta.ingredients || ""),
-        seasonings: String(meta.seasonings || ""),
-        price: Number(meta.price || 0),
-        isPublished: Boolean(meta.isPublished ?? true),
-        isAvailable: Boolean(meta.isAvailable ?? true),
-        categoryId: category.id,
-      };
-
-      const existing = await prisma.dish.findFirst({ where: { name, categoryId: category.id } });
-      const dish = existing
-        ? await prisma.dish.update({ where: { id: existing.id }, data: dishData })
-        : await prisma.dish.create({ data: dishData });
-
-      const imageRelPaths = Array.isArray(meta.images) ? meta.images : [];
-      const restoredUrls: string[] = [];
-      for (const relPath of imageRelPaths) {
-        const zipPath = toPosix(path.join(dir, String(relPath || "")));
-        const fileInZip = zip.file(zipPath);
-        if (!fileInZip) continue;
-        const fileBytes = await fileInZip.async("nodebuffer");
-        const ext = path.extname(zipPath) || ".jpg";
-        const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
-        const target = path.join(publicUploadsDir, filename);
-        await fs.writeFile(target, fileBytes);
-        restoredUrls.push(`/uploads/${filename}`);
-        imageCount += 1;
+      if (dryRun) {
+        imported += 1;
+        imageCount += (Array.isArray(meta.images) ? meta.images : []).length;
+        continue;
       }
 
-      if (restoredUrls.length > 0) {
-        await prisma.dishImage.deleteMany({ where: { dishId: dish.id } });
-        await prisma.dishImage.createMany({
-          data: restoredUrls.map((url, idx) => ({
-            dishId: dish.id,
-            url,
-            isCover: idx === 0,
-          })),
-        });
-      }
+      await prisma.$transaction(async (tx) => {
+        const existedCategory = await tx.category.findFirst({ where: { name: categoryName } });
+        const category = existedCategory
+          ? await tx.category.update({
+              where: { id: existedCategory.id },
+              data: { sortOrder: Number(meta.categorySortOrder || existedCategory.sortOrder || 0), isEnabled: true },
+            })
+          : await tx.category.create({
+              data: {
+                name: categoryName,
+                sortOrder: Number(meta.categorySortOrder || 0),
+                isEnabled: true,
+              },
+            });
+
+        const existing = await tx.dish.findFirst({ where: { name, categoryId: category.id } });
+        const dishData = {
+          name,
+          englishName: String(meta.englishName || ""),
+          tags: String(meta.tags || ""),
+          description: String(meta.description || ""),
+          method: String(meta.method || ""),
+          ingredients: String(meta.ingredients || ""),
+          seasonings: String(meta.seasonings || ""),
+          price: Number(meta.price || 0),
+          isPublished: Boolean(meta.isPublished ?? true),
+          isAvailable: Boolean(meta.isAvailable ?? true),
+          categoryId: category.id,
+        };
+        const dish = existing
+          ? await tx.dish.update({ where: { id: existing.id }, data: dishData })
+          : await tx.dish.create({ data: dishData });
+
+        const imageRelPaths = Array.isArray(meta.images) ? meta.images : [];
+        const restoredUrls: string[] = [];
+        for (const relPath of imageRelPaths) {
+          const zipPath = toPosix(path.join(dir, String(relPath || "")));
+          const fileInZip = zip.file(zipPath);
+          if (!fileInZip) continue;
+          const fileBytes = await fileInZip.async("nodebuffer");
+          const ext = path.extname(zipPath) || ".jpg";
+          const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
+          const target = path.join(publicUploadsDir, filename);
+          await fs.writeFile(target, fileBytes, { flush: true });
+          restoredUrls.push(`/api/uploads/${encodeURIComponent(filename)}`);
+          imageCount += 1;
+        }
+
+        if (restoredUrls.length > 0) {
+          await tx.dishImage.deleteMany({ where: { dishId: dish.id } });
+          await tx.dishImage.createMany({
+            data: restoredUrls.map((url, idx) => ({
+              dishId: dish.id,
+              url,
+              isCover: idx === 0,
+            })),
+          });
+        }
+      });
       imported += 1;
     }
 
-    return NextResponse.json({ ok: true, imported, imageCount });
+    await logInfo("backup_restore_completed", { imported, imageCount, dryRun, warnings: warnings.length });
+    return NextResponse.json({ ok: true, imported, imageCount, dryRun, warnings });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "恢复失败";
+    await logError("backup_restore_failed", error);
     return NextResponse.json({ ok: false, message: `恢复失败：${msg}` }, { status: 400 });
   }
 }

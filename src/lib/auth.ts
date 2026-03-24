@@ -1,7 +1,9 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import { assertProdSecurityEnv } from "./env";
 
 const COOKIE_NAME = "admin_session";
+assertProdSecurityEnv();
 
 function sign(value: string) {
   const secret = process.env.ADMIN_SESSION_SECRET || "dev-secret";

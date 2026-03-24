@@ -63,6 +63,12 @@ type Order = {
   guest: { name: string };
   items: { id: string; quantity: number; dish: { name: string; method: string; ingredients: string; seasonings: string } }[];
 };
+type AdminUser = {
+  id: string;
+  username: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
 const tabs = ["menu", "orders", "settings"] as const;
 const tabLabel: Record<(typeof tabs)[number], string> = {
@@ -142,6 +148,11 @@ export default function AdminPage() {
   const [showPrimaryInviteCard, setShowPrimaryInviteCard] = useState(false);
   const [showLowFrequencySettings, setShowLowFrequencySettings] = useState(false);
   const [settingsSubTab, setSettingsSubTab] = useState<"links" | "categories" | "system" | "password">("links");
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [newAdminUsername, setNewAdminUsername] = useState("");
+  const [newAdminPassword, setNewAdminPassword] = useState("");
+  const [resetAdminUsername, setResetAdminUsername] = useState("");
+  const [resetAdminNewPassword, setResetAdminNewPassword] = useState("");
 
   const statusText = (status: Order["status"]) => (status === "PENDING" ? "待备餐" : status === "PREPARING" ? "备餐中" : "已完成");
   const inviteLink = useMemo(() => (invite?.token ? `${globalThis.location?.origin || ""}/menu/${invite.token}` : ""), [invite]);
@@ -168,12 +179,13 @@ export default function AdminPage() {
     const orderUrl = withOrderFilter
       ? `/api/admin/orders?name=${encodeURIComponent(orderFilterName)}&from=${encodeURIComponent(orderFilterFrom)}&to=${encodeURIComponent(orderFilterTo)}&status=${encodeURIComponent(orderFilterStatus)}`
       : "/api/admin/orders";
-    const [c, d, r, i, s] = await Promise.all([
+    const [c, d, r, i, s, u] = await Promise.all([
       fetch("/api/admin/categories").then(safeJson),
       fetch("/api/admin/dishes").then(safeJson),
       fetch(orderUrl).then(safeJson),
       fetch("/api/admin/invite").then(safeJson),
       fetch("/api/admin/settings").then(safeJson),
+      fetch("/api/admin/users").then(safeJson),
     ]);
     setCategories(c.data || []);
     setDishes(d.data || []);
@@ -205,6 +217,7 @@ export default function AdminPage() {
         smtpPort: s.setting.smtpPort || 587,
       });
     }
+    if (u.ok) setAdminUsers(u.users || []);
   }, [isEditingSettings, orderFilterFrom, orderFilterName, orderFilterStatus, orderFilterTo]);
 
   useEffect(() => {
@@ -466,6 +479,20 @@ export default function AdminPage() {
     }
   }
 
+  async function previewMenuBackupZip(file: File) {
+    if (!file) return;
+    const fd = new FormData();
+    fd.set("file", file);
+    fd.set("mode", "dry-run");
+    const res = await fetch("/api/admin/backup-menu", { method: "POST", body: fd });
+    const d = await safeJson(res);
+    if (d.ok) {
+      setMessage(`预检完成：将处理 ${d.imported || 0} 道菜，图片 ${d.imageCount || 0} 张，警告 ${Array.isArray(d.warnings) ? d.warnings.length : 0} 条`);
+    } else {
+      setMessage(d.message || "预检失败");
+    }
+  }
+
   async function cleanupUnusedTags() {
     if (!confirm("一键清理无效标签：将从“不可点菜品”里移除那些当前没有任何可点菜品使用的标签。确认执行吗？")) return;
     const res = await fetch("/api/admin/dishes", {
@@ -611,6 +638,38 @@ export default function AdminPage() {
       body: JSON.stringify({ oldPassword, newPassword }),
     }).then((r) => r.json());
     setMessage(d.ok ? "密码修改成功" : d.message || "修改失败");
+  }
+
+  async function createAdminUser() {
+    const res = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: newAdminUsername, password: newAdminPassword }),
+    });
+    const d = await safeJson(res);
+    if (d.ok) {
+      setMessage("管理员已创建");
+      setNewAdminUsername("");
+      setNewAdminPassword("");
+      await refresh(false);
+    } else {
+      setMessage(d.message || "创建管理员失败");
+    }
+  }
+
+  async function resetTargetAdminPassword() {
+    const res = await fetch("/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: resetAdminUsername, newPassword: resetAdminNewPassword }),
+    });
+    const d = await safeJson(res);
+    if (d.ok) {
+      setMessage("管理员密码已重置");
+      setResetAdminNewPassword("");
+    } else {
+      setMessage(d.message || "重置失败");
+    }
   }
 
   async function copyInviteLink() {
@@ -1510,6 +1569,21 @@ export default function AdminPage() {
                 <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={() => void exportMenuBackupZip()}>
                   一键备份 ZIP
                 </button>
+                <button
+                  className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50"
+                  onClick={() => {
+                    const input = document.createElement("input");
+                    input.type = "file";
+                    input.accept = ".zip,application/zip";
+                    input.onchange = () => {
+                      const file = input.files?.[0];
+                      if (file) void previewMenuBackupZip(file);
+                    };
+                    input.click();
+                  }}
+                >
+                  预检恢复 ZIP
+                </button>
                 <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={() => restoreZipInputRef.current?.click()}>
                   一键恢复 ZIP
                 </button>
@@ -1533,6 +1607,37 @@ export default function AdminPage() {
             <input className="mt-2 w-full rounded-xl border border-zinc-200 px-3 py-2" name="newPassword" type="password" placeholder="新密码" />
             <button className="mt-2 rounded-xl bg-black px-3 py-2 text-sm text-white">保存新密码</button>
           </form>
+          <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "password" ? "" : "hidden"}`}>
+            <h3 className="font-semibold">管理员管理</h3>
+            <div className="mt-2 grid gap-2 md:grid-cols-2">
+              <input className="rounded-xl border border-zinc-200 px-3 py-2 text-sm" placeholder="新管理员用户名（3-24位）" value={newAdminUsername} onChange={(e) => setNewAdminUsername(e.target.value)} />
+              <input className="rounded-xl border border-zinc-200 px-3 py-2 text-sm" type="password" placeholder="新管理员密码（至少8位）" value={newAdminPassword} onChange={(e) => setNewAdminPassword(e.target.value)} />
+            </div>
+            <button className="mt-2 rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={() => void createAdminUser()}>
+              新增管理员
+            </button>
+            <div className="mt-4 grid gap-2 md:grid-cols-2">
+              <select className="rounded-xl border border-zinc-200 px-3 py-2 text-sm" value={resetAdminUsername} onChange={(e) => setResetAdminUsername(e.target.value)}>
+                <option value="">选择要重置密码的管理员</option>
+                {adminUsers.map((u) => (
+                  <option key={u.id} value={u.username}>
+                    {u.username}
+                  </option>
+                ))}
+              </select>
+              <input className="rounded-xl border border-zinc-200 px-3 py-2 text-sm" type="password" placeholder="新密码（至少8位）" value={resetAdminNewPassword} onChange={(e) => setResetAdminNewPassword(e.target.value)} />
+            </div>
+            <button className="mt-2 rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={() => void resetTargetAdminPassword()}>
+              重置指定管理员密码
+            </button>
+            <div className="mt-3 max-h-40 overflow-auto rounded-xl border border-zinc-200 p-2 text-xs text-zinc-600">
+              {adminUsers.map((u) => (
+                <p key={u.id}>
+                  {u.username}（创建于 {new Date(u.createdAt).toLocaleString()}）
+                </p>
+              ))}
+            </div>
+          </div>
           <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "categories" ? "" : "hidden"}`}>
             <h2 className="font-semibold">菜品类型管理</h2>
             <p className="mt-1 text-xs text-zinc-500">支持新增、删除、拖拽排序，排序结果会同步到用户点餐端。</p>
