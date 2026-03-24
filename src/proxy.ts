@@ -15,7 +15,15 @@ export function proxy(req: NextRequest) {
   }
 
   const token = req.cookies.get("admin_session")?.value;
-  if (token) return NextResponse.next();
+  if (token) {
+    const res = NextResponse.next();
+    if (pathname.startsWith("/admin")) {
+      res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.headers.set("Pragma", "no-cache");
+      res.headers.set("Expires", "0");
+    }
+    return res;
+  }
 
   const loginUrl = new URL("/admin/login", req.url);
   return NextResponse.redirect(loginUrl);

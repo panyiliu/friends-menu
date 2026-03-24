@@ -153,6 +153,7 @@ export default function AdminPage() {
   const [newAdminPassword, setNewAdminPassword] = useState("");
   const [resetAdminUsername, setResetAdminUsername] = useState("");
   const [resetAdminNewPassword, setResetAdminNewPassword] = useState("");
+  const [authedChecked, setAuthedChecked] = useState(false);
 
   const statusText = (status: Order["status"]) => (status === "PENDING" ? "待备餐" : status === "PREPARING" ? "备餐中" : "已完成");
   const inviteLink = useMemo(() => (invite?.token ? `${globalThis.location?.origin || ""}/menu/${invite.token}` : ""), [invite]);
@@ -174,6 +175,15 @@ export default function AdminPage() {
       return { ok: false };
     }
   };
+
+  async function ensureAuthedOrRedirect() {
+    const res = await fetch("/api/admin/session");
+    if (res.status === 401) {
+      location.href = "/admin/login";
+      return false;
+    }
+    return true;
+  }
 
   const refresh = useCallback(async (withOrderFilter = false) => {
     const orderUrl = withOrderFilter
@@ -221,8 +231,17 @@ export default function AdminPage() {
   }, [isEditingSettings, orderFilterFrom, orderFilterName, orderFilterStatus, orderFilterTo]);
 
   useEffect(() => {
-    const init = setTimeout(() => void refresh(false), 0);
-    const timer = setInterval(() => void refresh(false), Math.max(5, settings.refreshIntervalSec || 8) * 1000);
+    const init = setTimeout(async () => {
+      const ok = await ensureAuthedOrRedirect();
+      if (!ok) return;
+      setAuthedChecked(true);
+      await refresh(false);
+    }, 0);
+    const timer = setInterval(async () => {
+      const ok = await ensureAuthedOrRedirect();
+      if (!ok) return;
+      await refresh(false);
+    }, Math.max(5, settings.refreshIntervalSec || 8) * 1000);
     return () => {
       clearTimeout(init);
       clearInterval(timer);
@@ -747,6 +766,14 @@ export default function AdminPage() {
     } else {
       setMessage(d.message || "模板保存失败");
     }
+  }
+
+  if (!authedChecked) {
+    return (
+      <main className="min-h-screen bg-zinc-50">
+        <div className="mx-auto max-w-6xl p-6 text-sm text-zinc-500">正在校验登录状态...</div>
+      </main>
+    );
   }
 
   return (
