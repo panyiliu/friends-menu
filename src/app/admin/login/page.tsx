@@ -15,7 +15,13 @@ export default function AdminLoginPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
-    const data = await res.json();
+    const text = await res.text();
+    let data: { ok?: boolean; message?: string } = {};
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { ok: false, message: "登录接口返回异常，请查看服务端日志" };
+    }
     if (data.ok) router.push("/admin");
     else setMessage(data.message || "登录失败");
   }
