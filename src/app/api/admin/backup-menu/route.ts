@@ -34,6 +34,27 @@ function toPosix(input: string) {
   return input.replace(/\\/g, "/");
 }
 
+function toLocalUploadPath(input: string) {
+  const raw = String(input || "").trim();
+  if (!raw) return "";
+  if (raw.startsWith("/api/uploads/")) {
+    return `/uploads/${decodeURIComponent(raw.replace("/api/uploads/", ""))}`;
+  }
+  if (raw.startsWith("/uploads/")) return raw;
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      const u = new URL(raw);
+      if (u.pathname.startsWith("/api/uploads/")) {
+        return `/uploads/${decodeURIComponent(u.pathname.replace("/api/uploads/", ""))}`;
+      }
+      if (u.pathname.startsWith("/uploads/")) return u.pathname;
+    } catch {
+      return "";
+    }
+  }
+  return "";
+}
+
 export async function GET(req: NextRequest) {
   if (!ensureAdmin(req)) return NextResponse.json({ ok: false }, { status: 401 });
   try {
@@ -63,11 +84,8 @@ export async function GET(req: NextRequest) {
 
       const imagePaths: string[] = [];
       for (const image of dish.images) {
-        const relPath = String(image.url || "");
-        if (!relPath.startsWith("/")) continue;
-        const normalized = relPath.startsWith("/api/uploads/")
-          ? `/uploads/${decodeURIComponent(relPath.replace("/api/uploads/", ""))}`
-          : relPath;
+        const normalized = toLocalUploadPath(String(image.url || ""));
+        if (!normalized) continue;
         const fsPath = path.join(publicDir, normalized.replace(/^\//, ""));
         try {
           const fileBuf = await fs.readFile(fsPath);
@@ -196,7 +214,13 @@ export async function POST(req: NextRequest) {
         for (const relPath of imageRelPaths) {
           const zipPath = toPosix(path.join(dir, String(relPath || "")));
           const fileInZip = zip.file(zipPath);
-          if (!fileInZip) continue;
+          if (!fileInZip) {
+            const fallbackUrl = String(relPath || "").trim();
+            if (fallbackUrl.startsWith("/api/uploads/") || fallbackUrl.startsWith("/uploads/")) {
+              restoredUrls.push(fallbackUrl);
+            }
+            continue;
+          }
           const fileBytes = await fileInZip.async("nodebuffer");
           const ext = path.extname(zipPath) || ".jpg";
           const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
@@ -215,6 +239,8 @@ export async function POST(req: NextRequest) {
               isCover: idx === 0,
             })),
           });
+        } else if (imageRelPaths.length > 0) {
+          warnings.push(`图片缺失: ${name}（ZIP 内未找到对应 images 文件）`);
         }
       });
       imported += 1;
