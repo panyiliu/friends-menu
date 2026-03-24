@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     const pass = await bcrypt.compare(password || "", user.passwordHash);
     if (!pass) return NextResponse.json({ ok: false, message: "账号或密码错误" }, { status: 401 });
 
-    if (process.env.NODE_ENV === "production" && user.username === "admin") {
+    if (process.env.NODE_ENV === "production" && process.env.REQUIRE_NON_DEFAULT_ADMIN_PASSWORD === "true" && user.username === "admin") {
       const usingDefault = await bcrypt.compare("admin123456", user.passwordHash);
       if (usingDefault) {
         await logWarn("default_admin_password_blocked", { ip, username: user.username });

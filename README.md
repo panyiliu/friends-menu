@@ -124,6 +124,7 @@ docker compose up -d --build
 ADMIN_SESSION_SECRET=请替换为至少24位随机串
 ADMIN_SESSION_SECURE=true
 DATABASE_URL=file:/app/prisma/dev.db
+REQUIRE_NON_DEFAULT_ADMIN_PASSWORD=false
 ```
 
 说明：
@@ -204,7 +205,7 @@ git pull
 
 ## 安全基线（公网）
 
-- 禁用默认后台密码：生产环境会阻止 `admin/admin123456` 登录。
+- 可选禁用默认后台密码：设置 `REQUIRE_NON_DEFAULT_ADMIN_PASSWORD=true` 后，生产环境会阻止 `admin/admin123456` 登录。
 - 登录防爆破：登录接口启用 IP + 账号维度限流。
 - 管理端 API 限流：`/api/admin/*` 在网关层和应用层均建议开启限流。
 - 日志落盘：应用运行日志写入 `logs/app.log`（JSON 行格式）。
