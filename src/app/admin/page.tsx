@@ -140,6 +140,7 @@ export default function AdminPage() {
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [showPrimaryInviteCard, setShowPrimaryInviteCard] = useState(false);
   const [showLowFrequencySettings, setShowLowFrequencySettings] = useState(false);
+  const [settingsSubTab, setSettingsSubTab] = useState<"links" | "categories" | "system" | "password">("links");
 
   const statusText = (status: Order["status"]) => (status === "PENDING" ? "待备餐" : status === "PREPARING" ? "备餐中" : "已完成");
   const inviteLink = useMemo(() => (invite?.token ? `${globalThis.location?.origin || ""}/menu/${invite.token}` : ""), [invite]);
@@ -394,13 +395,13 @@ export default function AdminPage() {
       body: JSON.stringify(settings),
     });
     const txt = await res.text();
-    let d: { ok?: boolean } = {};
+    let d: { ok?: boolean; message?: string } = {};
     try {
       d = JSON.parse(txt);
     } catch {
       d = { ok: false };
     }
-    setMessage(d.ok ? "系统设置已保存" : "系统设置保存失败");
+    setMessage(d.ok ? "系统设置已保存" : d.message || "系统设置保存失败");
     setIsEditingSettings(false);
     await refresh(tab === "orders");
   }
@@ -1013,8 +1014,14 @@ export default function AdminPage() {
       ) : null}
 
       {tab === "settings" ? (
-        <section className="mt-4 grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm md:col-span-2">
+        <section className="mt-4 space-y-4">
+          <div className="flex flex-wrap gap-2 rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
+            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "links" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("links")}>链接管理</button>
+            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "categories" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("categories")}>菜品类型管理</button>
+            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "system" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("system")}>系统设置</button>
+            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "password" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("password")}>修改后台密码</button>
+          </div>
+          <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "links" ? "" : "hidden"}`}>
             <h2 className="font-semibold">点餐链接管理</h2>
             <p className="mt-1 text-xs text-gray-500">模板支持变量：<code>{"{{friendName}}"}</code>，会自动替换为该链接的朋友姓名。</p>
 
@@ -1096,6 +1103,10 @@ export default function AdminPage() {
                   value={newInviteGuestName}
                   onChange={(e) => setNewInviteGuestName(e.target.value)}
                 />
+                <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                  <p>变量写法：<code>{"{{friendName}}"}</code></p>
+                  <p className="mt-1">预览：{`欢迎你，${newInviteGuestName || "朋友"}，开始点餐`}</p>
+                </div>
                 <label className="mt-2 flex items-center gap-2 text-sm text-zinc-700">
                   <input type="checkbox" checked={newInviteShowPrice} onChange={(e) => setNewInviteShowPrice(e.target.checked)} />
                   该链接对外展示价格
@@ -1250,14 +1261,10 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+          <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "system" ? "" : "hidden"}`}>
             <h2 className="font-semibold">系统设置</h2>
-            <button
-              type="button"
-              className="mt-2 flex w-full items-center justify-between rounded-xl border border-zinc-200 px-3 py-2 text-left text-sm hover:bg-zinc-50"
-              onClick={() => setShowLowFrequencySettings((v) => !v)}
-            >
-              <span className="font-medium">低频区（邮件与密码）</span>
+            <button type="button" className="mt-2 flex w-full items-center justify-between rounded-xl border border-zinc-200 px-3 py-2 text-left text-sm hover:bg-zinc-50" onClick={() => setShowLowFrequencySettings((v) => !v)}>
+              <span className="font-medium">低频区（邮件）</span>
               <span className="text-xs text-zinc-500">{showLowFrequencySettings ? "收起" : "展开"}</span>
             </button>
             <label className="mt-2 block text-sm">系统名称</label>
@@ -1430,13 +1437,13 @@ export default function AdminPage() {
               </button>
             </div>
           </div>
-          <form className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${showLowFrequencySettings ? "" : "hidden"}`} action={changePassword}>
+          <form className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "password" ? "" : "hidden"}`} action={changePassword}>
             <h2 className="font-semibold">修改后台密码</h2>
             <input className="mt-2 w-full rounded-xl border border-zinc-200 px-3 py-2" name="oldPassword" type="password" placeholder="旧密码" />
             <input className="mt-2 w-full rounded-xl border border-zinc-200 px-3 py-2" name="newPassword" type="password" placeholder="新密码" />
             <button className="mt-2 rounded-xl bg-black px-3 py-2 text-sm text-white">保存新密码</button>
           </form>
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm md:col-span-2">
+          <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "categories" ? "" : "hidden"}`}>
             <h2 className="font-semibold">菜品类型管理</h2>
             <p className="mt-1 text-xs text-zinc-500">支持新增、删除、拖拽排序，排序结果会同步到用户点餐端。</p>
             <div className="mt-2 flex gap-2">
