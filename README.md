@@ -111,6 +111,7 @@ docker compose up -d --build
 
 - `prisma/dev.db` 和 `public/uploads` 已挂载为宿主机目录，重启容器不会丢数据。
 - 若你要迁移“账号密码、菜单、图片”，请确保这两个路径在 Git 中已推送并拉取到目标服务器。
+- 容器内数据库连接使用绝对路径：`file:/app/prisma/dev.db`，可避免某些环境下相对路径导致的“Unable to open the database file”。
 
 ### 常用命令
 
