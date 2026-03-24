@@ -41,6 +41,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
     categories,
     availableTags,
     showPrice: Boolean(invite.showPrice),
+    inviteGuestName: invite.inviteGuestName || "",
     welcomeTemplate: {
       enabled: Boolean(invite.welcomeEnabled),
       title: invite.welcomeTitle || "欢迎光临",

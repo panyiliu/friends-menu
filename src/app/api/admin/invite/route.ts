@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
       data: {
         token: nanoid(),
         isActive: true,
+        inviteGuestName: String(body.inviteGuestName || ""),
         showPrice: Boolean(body.showPrice ?? false),
         expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
         welcomeEnabled: tpl.welcomeEnabled ?? true,
@@ -84,6 +85,7 @@ export async function POST(req: NextRequest) {
       data: {
         token: nanoid(),
         label: String(body.label || ""),
+        inviteGuestName: String(body.inviteGuestName || ""),
         isActive: Boolean(body.isActive ?? true),
         showPrice: Boolean(body.showPrice ?? false),
         expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
@@ -127,6 +129,7 @@ export async function POST(req: NextRequest) {
       where: { id: String(body.id || setting.activeInviteId) },
       data: {
         label: body.label !== undefined ? String(body.label || "") : undefined,
+        inviteGuestName: body.inviteGuestName !== undefined ? String(body.inviteGuestName || "") : undefined,
         expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
         isActive: body.isActive === undefined ? undefined : Boolean(body.isActive),
         showPrice: body.showPrice === undefined ? undefined : Boolean(body.showPrice),

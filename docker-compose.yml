@@ -6,6 +6,7 @@ services:
       - "3000:3000"
     environment:
       - DATABASE_URL=file:/app/prisma/dev.db
+      - ADMIN_SESSION_SECURE=false
     restart: unless-stopped
     volumes:
       - ./prisma:/app/prisma

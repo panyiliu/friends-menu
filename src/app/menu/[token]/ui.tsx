@@ -31,7 +31,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
   const [cart, setCart] = useState<Cart>({});
   const [hydrated, setHydrated] = useState(false);
   const [loadingMenu, setLoadingMenu] = useState(true);
-  const [guestName, setGuestName] = useState("");
+  const [inviteGuestName, setInviteGuestName] = useState("");
   const [note, setNote] = useState("");
   const [eta, setEta] = useState("");
   const [loading, setLoading] = useState(false);
@@ -59,6 +59,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
         if (d.ok) {
           setCategories(d.categories || []);
           setShowPrice(Boolean(d.showPrice));
+          setInviteGuestName(String(d.inviteGuestName || ""));
           setWelcomeTemplate(d.welcomeTemplate || null);
           setUiConfig({
             guestTitle: d.uiConfig?.guestTitle || "朋友·聚",
@@ -144,6 +145,8 @@ export default function GuestMenuClient({ token }: { token: string }) {
       : welcomeTemplate?.textAlign === "right"
         ? "text-right"
         : "text-center";
+  const resolvedGuestName = (inviteGuestName || "朋友").trim() || "朋友";
+  const withFriendName = (text: string) => String(text || "").replace(/\{\{\s*friendName\s*\}\}/gi, resolvedGuestName);
 
   const add = (id: string) => {
     setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }));
@@ -191,11 +194,6 @@ export default function GuestMenuClient({ token }: { token: string }) {
   }, [categories]);
 
   async function submit() {
-    if (!guestName.trim()) {
-      setMessage("请先填写点餐人姓名");
-      showToast("请填写点餐人姓名", 1200);
-      return;
-    }
     if (totalCount === 0) {
       setMessage("请先添加至少一道菜");
       showToast("菜单还是空的，请先添加菜品", 1200);
@@ -207,7 +205,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
     const res = await fetch("/api/guest/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, guestName, note, eta, items }),
+      body: JSON.stringify({ token, guestName: resolvedGuestName, note, eta, items }),
     });
     const data = await res.json();
     if (data.ok) {
@@ -545,7 +543,9 @@ export default function GuestMenuClient({ token }: { token: string }) {
               </div>
             ) : null}
             <div className="space-y-3">
-              <input type="text" placeholder="点餐人姓名" className="premium-input w-full px-4 py-3 text-sm font-medium placeholder:text-stone-400" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
+              {inviteGuestName ? (
+                <div className="premium-input w-full px-4 py-3 text-sm font-medium text-stone-700">点餐人：{resolvedGuestName}</div>
+              ) : null}
               <input type="text" placeholder="预计到访时间 (例如 19:00)" className="premium-input w-full px-4 py-3 text-sm" value={eta} onChange={(e) => setEta(e.target.value)} />
               <textarea rows={2} placeholder="特殊要求 / 忌口 / 加辣" className="premium-input w-full resize-none px-4 py-3 text-sm" value={note} onChange={(e) => setNote(e.target.value)} />
               <button
@@ -583,14 +583,14 @@ export default function GuestMenuClient({ token }: { token: string }) {
           style={{ backgroundColor: `rgba(0,0,0,${Math.max(0, Math.min(80, welcomeTemplate.backdropOpacity || 35)) / 100})` }}
         >
           <div className={`w-full max-w-md rounded-3xl border border-white/30 bg-white/70 p-6 shadow-2xl backdrop-blur-xl ${welcomeAlignClass}`}>
-            <h2 className={`${welcomeTitleClass} ${welcomeFontWeightClass} tracking-tight text-stone-900`}>{welcomeTemplate.title || "欢迎光临"}</h2>
-            <p className="mt-3 text-sm text-stone-600">{welcomeTemplate.subtitle || "请开始点餐"}</p>
+            <h2 className={`${welcomeTitleClass} ${welcomeFontWeightClass} tracking-tight text-stone-900`}>{withFriendName(welcomeTemplate.title || "欢迎光临")}</h2>
+            <p className="mt-3 text-sm text-stone-600">{withFriendName(welcomeTemplate.subtitle || "请开始点餐")}</p>
             <button
               className="mt-6 w-full rounded-2xl px-4 py-3 text-sm font-semibold text-white shadow-md transition hover:opacity-95"
               style={{ backgroundColor: welcomeTemplate.buttonColor || "#111827" }}
               onClick={enterMenu}
             >
-              {welcomeTemplate.buttonText || "开始点餐"}
+              {withFriendName(welcomeTemplate.buttonText || "开始点餐")}
             </button>
           </div>
         </div>

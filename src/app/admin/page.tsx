@@ -35,6 +35,7 @@ type Invite = {
   id: string;
   token: string;
   label?: string;
+  inviteGuestName?: string;
   isActive?: boolean;
   isExpired?: boolean;
   expiresAt?: string | null;
@@ -96,6 +97,7 @@ export default function AdminPage() {
   const [orderFilterStatus, setOrderFilterStatus] = useState("");
   const [inviteExpiresAt, setInviteExpiresAt] = useState("");
   const [newInviteLabel, setNewInviteLabel] = useState("");
+  const [newInviteGuestName, setNewInviteGuestName] = useState("");
   const [newInviteShowPrice, setNewInviteShowPrice] = useState(false);
   const [newInviteTemplate, setNewInviteTemplate] = useState<WelcomeTemplate>(defaultWelcomeTemplate);
   const [settings, setSettings] = useState<Settings>({
@@ -450,12 +452,13 @@ export default function AdminPage() {
     const res = await fetch("/api/admin/invite", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "create", label: newInviteLabel, expiresAt, isActive: true, showPrice: newInviteShowPrice, ...newInviteTemplate }),
+      body: JSON.stringify({ mode: "create", label: newInviteLabel, inviteGuestName: newInviteGuestName, expiresAt, isActive: true, showPrice: newInviteShowPrice, ...newInviteTemplate }),
     });
     const d = await safeJson(res);
     if (d.ok) {
       setMessage("新链接已创建");
       setNewInviteLabel("");
+      setNewInviteGuestName("");
       setNewInviteShowPrice(false);
       setNewInviteTemplate({ ...defaultWelcomeTemplate });
       await refresh(false);
@@ -1076,6 +1079,12 @@ export default function AdminPage() {
                   value={newInviteLabel}
                   onChange={(e) => setNewInviteLabel(e.target.value)}
                 />
+                <input
+                  className="mt-2 w-full rounded-xl border border-zinc-200 px-2 py-1 text-sm"
+                  placeholder="朋友姓名（用于欢迎词变量与下单姓名）"
+                  value={newInviteGuestName}
+                  onChange={(e) => setNewInviteGuestName(e.target.value)}
+                />
                 <label className="mt-2 flex items-center gap-2 text-sm text-zinc-700">
                   <input type="checkbox" checked={newInviteShowPrice} onChange={(e) => setNewInviteShowPrice(e.target.checked)} />
                   该链接对外展示价格
@@ -1130,6 +1139,7 @@ export default function AdminPage() {
                           <p className="font-medium">
                             {x.label || "未命名链接"} {isMain ? "（主）" : ""}
                           </p>
+                          {x.inviteGuestName ? <span className="text-zinc-500">朋友：{x.inviteGuestName}</span> : null}
                           <span className="text-zinc-500">
                             {x.isActive ? "启用" : "停用"} / {x.isExpired ? "过期" : "有效"}
                           </span>

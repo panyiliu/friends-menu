@@ -11,10 +11,11 @@ function sign(value: string) {
 export async function setAdminSession(username: string) {
   const payload = `${username}|${Date.now()}`;
   const signature = sign(payload);
+  const secureCookie = process.env.ADMIN_SESSION_SECURE === "true";
   (await cookies()).set(COOKIE_NAME, `${payload}.${signature}`, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: secureCookie,
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });

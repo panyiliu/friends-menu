@@ -64,6 +64,7 @@ model InviteLink {
   id        String   @id @default(cuid())
   token     String   @unique
   label     String   @default("")
+  inviteGuestName String @default("")
   isActive  Boolean  @default(true)
   showPrice Boolean  @default(false)
   welcomeEnabled         Boolean @default(true)

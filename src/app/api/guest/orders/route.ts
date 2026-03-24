@@ -5,7 +5,7 @@ import { z } from "zod";
 
 const schema = z.object({
   token: z.string().min(6),
-  guestName: z.string().min(1).max(20),
+  guestName: z.string().max(20).optional().default(""),
   note: z.string().max(200).optional().default(""),
   eta: z.string().max(60).optional().default(""),
   items: z.array(z.object({ dishId: z.string(), quantity: z.number().int().positive() })).min(1),
@@ -29,7 +29,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, message: "存在不可点菜品，请刷新后重试" }, { status: 400 });
   }
 
-  const guest = await prisma.guestProfile.create({ data: { name: guestName } });
+  const resolvedGuestName = String(invite.inviteGuestName || guestName || invite.label || "朋友").trim().slice(0, 20) || "朋友";
+  const guest = await prisma.guestProfile.create({ data: { name: resolvedGuestName } });
   const order = await prisma.order.create({
     data: {
       inviteId: invite.id,
@@ -42,7 +43,7 @@ export async function POST(req: Request) {
   });
   try {
     await sendNewOrderEmail({
-      guestName,
+      guestName: resolvedGuestName,
       createdAt: order.createdAt,
       note,
       items: items.map((i) => ({ name: dishes.find((d) => d.id === i.dishId)?.name || "未知菜品", quantity: i.quantity })),
