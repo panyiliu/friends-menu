@@ -115,6 +115,7 @@ docker compose up -d --build
 - 这两个目录属于运行数据，不建议再通过 Git 传输与合并。
 - 容器内数据库连接使用绝对路径：`file:/app/prisma/dev.db`，可避免某些环境下相对路径导致的“Unable to open the database file”。
 - 后台登录 cookie 的 `Secure` 开关由 `ADMIN_SESSION_SECURE` 控制；HTTP 内网访问请设为 `false`，HTTPS 域名访问可设为 `true`。
+- 默认 compose 已内置 `ADMIN_SESSION_SECURE=true` 与安全密钥占位值，拉取后可直接启动；建议尽快在服务器环境变量中覆盖为你自己的强密钥。
 - 公网部署建议使用独立反向代理（Nginx/Caddy）终止 HTTPS，并将 `ADMIN_SESSION_SECURE=true`。
 - 健康检查接口：`/api/health`（建议配置到反代或容器探活）。
 

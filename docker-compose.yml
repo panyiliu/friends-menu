@@ -6,7 +6,9 @@ services:
       - "5223:3000"
     environment:
       - DATABASE_URL=file:/app/prisma/dev.db
-      - ADMIN_SESSION_SECURE=false
+      - ADMIN_SESSION_SECURE=${ADMIN_SESSION_SECURE:-true}
+      - ADMIN_SESSION_SECRET=${ADMIN_SESSION_SECRET:-replace_with_a_long_random_secret_please_change}
+      - REQUIRE_NON_DEFAULT_ADMIN_PASSWORD=${REQUIRE_NON_DEFAULT_ADMIN_PASSWORD:-false}
     restart: unless-stopped
     volumes:
       - ./prisma:/app/prisma
