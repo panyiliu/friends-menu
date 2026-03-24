@@ -49,8 +49,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, message: "图片尺寸过小，最少300x300" }, { status: 400 });
     }
 
-    await writeFile(path.join(uploadDir, name), buffer);
-    return NextResponse.json({ ok: true, url: `/uploads/${name}` });
+    await writeFile(path.join(uploadDir, name), buffer, { flush: true });
+    return NextResponse.json({ ok: true, url: `/api/uploads/${encodeURIComponent(name)}` });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "上传失败";
     return NextResponse.json({ ok: false, message: `上传失败：${msg}` }, { status: 500 });
