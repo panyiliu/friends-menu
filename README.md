@@ -42,7 +42,7 @@ npm run prisma:seed
 npm run dev
 ```
 
-打开 `http://localhost:3000`
+打开 `http://localhost:5223`
 
 ## 默认账号
 
@@ -94,7 +94,7 @@ npm run dev
 ## 压测脚本（10-30人）
 
 - 命令：`npm run stress:test -- <token> [count] [baseUrl]`
-- 示例：`npm run stress:test -- abcdef123456 30 http://localhost:3000`
+- 示例：`npm run stress:test -- abcdef123456 30 http://localhost:5223`
 - 用途：快速模拟多人并发下单，验证成功率与后台刷新表现。
 
 ## Docker 部署
@@ -105,7 +105,7 @@ npm run dev
 docker compose up -d --build
 ```
 
-访问：`http://<服务器IP>:3000`
+访问：`http://<服务器IP>:5223`
 
 ### 说明
 

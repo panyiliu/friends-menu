@@ -3,7 +3,7 @@ services:
     build: .
     container_name: friends-menu
     ports:
-      - "3000:3000"
+      - "5223:3000"
     environment:
       - DATABASE_URL=file:/app/prisma/dev.db
       - ADMIN_SESSION_SECURE=false
