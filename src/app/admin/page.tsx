@@ -1025,71 +1025,8 @@ export default function AdminPage() {
             <h2 className="font-semibold">点餐链接管理</h2>
             <p className="mt-1 text-xs text-gray-500">模板支持变量：<code>{"{{friendName}}"}</code>，会自动替换为该链接的朋友姓名。</p>
 
-            <div className="mt-3 grid gap-4 md:grid-cols-2">
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <h3 className="font-semibold">主链接（低频）</h3>
-                  <button type="button" className="rounded border px-2 py-0.5 text-xs" onClick={() => setShowPrimaryInviteCard((v) => !v)}>
-                    {showPrimaryInviteCard ? "隐藏" : "显示"}
-                  </button>
-                </div>
-                {showPrimaryInviteCard ? (
-                  <>
-                <p className="mt-2 text-sm font-medium">{invite?.label || "未命名主链接"}</p>
-                <p className="mt-1 text-xs text-gray-600">
-                  {invite?.expiresAt
-                    ? new Date(invite.expiresAt) < new Date()
-                      ? "当前链接状态：已过期"
-                      : `当前链接状态：有效（至 ${new Date(invite.expiresAt).toLocaleString()}）`
-                    : "当前链接状态：永久有效"}
-                </p>
-                <input className="mt-3 w-full rounded-xl border border-zinc-200 px-2 py-1 text-sm" type="datetime-local" value={inviteExpiresAt} onChange={(e) => setInviteExpiresAt(e.target.value)} />
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-xs text-gray-500">X天内有效期</span>
-                  <select
-                    className="rounded-xl border border-zinc-200 px-2 py-1 text-sm"
-                    value={expiryPresetDays}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setExpiryPresetDays(v);
-                      applyExpiryPreset(Number(v));
-                    }}
-                  >
-                    <option value="0">自定义</option>
-                    <option value="1">1天</option>
-                    <option value="3">3天</option>
-                    <option value="7">7天</option>
-                    <option value="15">15天</option>
-                    <option value="30">30天</option>
-                  </select>
-                </div>
-                <div className="mt-2 flex gap-2">
-                  <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={copyInviteLink}>
-                    复制链接
-                  </button>
-                  <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={saveInviteExpiry}>
-                    保存有效期
-                  </button>
-                  {invite ? (
-                    <button
-                      className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50"
-                      onClick={() =>
-                        toggleInvite(
-                          invite.id,
-                          !Boolean(invite.isActive ?? true),
-                          Boolean(invite.expiresAt && new Date(invite.expiresAt) < new Date())
-                        )
-                      }
-                    >
-                      {invite.isActive === false ? "启用主链接" : "停用主链接"}
-                    </button>
-                  ) : null}
-                </div>
-                  </>
-                ) : null}
-              </div>
-
-              <div>
+            <div className="mt-3 space-y-4">
+              <div className="rounded-xl border border-zinc-200 p-3">
                 <h3 className="font-semibold">新建链接与列表</h3>
                 <input
                   className="mt-2 w-full rounded-xl border border-zinc-200 px-2 py-1 text-sm"
@@ -1140,6 +1077,29 @@ export default function AdminPage() {
                     <div className="grid grid-cols-[1fr_auto] items-center gap-2">
                       <input className="h-8 w-full rounded border border-zinc-200" type="color" value={newInviteTemplate.welcomeButtonColor} onChange={(e) => setNewInviteTemplate((t) => ({ ...t, welcomeButtonColor: e.target.value }))} />
                       <input className="w-16 rounded-lg border border-zinc-200 px-2 py-1 text-xs" type="number" min={0} max={80} value={newInviteTemplate.welcomeBackdropOpacity} onChange={(e) => setNewInviteTemplate((t) => ({ ...t, welcomeBackdropOpacity: Math.max(0, Math.min(80, Number(e.target.value || 35))) }))} />
+                    </div>
+                    <div className="rounded-xl border border-amber-200/80 bg-white p-3">
+                      <div
+                        className="rounded-2xl border border-white/40 p-4 shadow-sm"
+                        style={{
+                          backgroundColor: `rgba(255,255,255,${Math.max(0.65, 1 - newInviteTemplate.welcomeBackdropOpacity / 100)})`,
+                          textAlign: newInviteTemplate.welcomeTextAlign,
+                        }}
+                      >
+                        <p className={`${newInviteTemplate.welcomeFontSize === "lg" ? "text-2xl" : newInviteTemplate.welcomeFontSize === "sm" ? "text-lg" : "text-xl"} ${newInviteTemplate.welcomeFontWeight === "bold" ? "font-bold" : newInviteTemplate.welcomeFontWeight === "medium" ? "font-medium" : newInviteTemplate.welcomeFontWeight === "normal" ? "font-normal" : "font-semibold"} text-stone-900`}>
+                          {String(newInviteTemplate.welcomeTitle || "欢迎光临").replace(/\{\{\s*friendName\s*\}\}/gi, newInviteGuestName || "朋友")}
+                        </p>
+                        <p className="mt-2 text-sm text-stone-600">
+                          {String(newInviteTemplate.welcomeSubtitle || "请开始点餐").replace(/\{\{\s*friendName\s*\}\}/gi, newInviteGuestName || "朋友")}
+                        </p>
+                        <button
+                          type="button"
+                          className="mt-3 rounded-xl px-3 py-1.5 text-sm font-semibold text-white"
+                          style={{ backgroundColor: newInviteTemplate.welcomeButtonColor || "#111827" }}
+                        >
+                          {String(newInviteTemplate.welcomeButtonText || "开始点餐").replace(/\{\{\s*friendName\s*\}\}/gi, newInviteGuestName || "朋友")}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </details>
@@ -1258,6 +1218,68 @@ export default function AdminPage() {
                     );
                   })}
                 </div>
+              </div>
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <h3 className="font-semibold">主链接（低频）</h3>
+                  <button type="button" className="rounded border px-2 py-0.5 text-xs" onClick={() => setShowPrimaryInviteCard((v) => !v)}>
+                    {showPrimaryInviteCard ? "隐藏" : "显示"}
+                  </button>
+                </div>
+                {showPrimaryInviteCard ? (
+                  <>
+                <p className="mt-2 text-sm font-medium">{invite?.label || "未命名主链接"}</p>
+                <p className="mt-1 text-xs text-gray-600">
+                  {invite?.expiresAt
+                    ? new Date(invite.expiresAt) < new Date()
+                      ? "当前链接状态：已过期"
+                      : `当前链接状态：有效（至 ${new Date(invite.expiresAt).toLocaleString()}）`
+                    : "当前链接状态：永久有效"}
+                </p>
+                <input className="mt-3 w-full rounded-xl border border-zinc-200 px-2 py-1 text-sm" type="datetime-local" value={inviteExpiresAt} onChange={(e) => setInviteExpiresAt(e.target.value)} />
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-xs text-gray-500">X天内有效期</span>
+                  <select
+                    className="rounded-xl border border-zinc-200 px-2 py-1 text-sm"
+                    value={expiryPresetDays}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setExpiryPresetDays(v);
+                      applyExpiryPreset(Number(v));
+                    }}
+                  >
+                    <option value="0">自定义</option>
+                    <option value="1">1天</option>
+                    <option value="3">3天</option>
+                    <option value="7">7天</option>
+                    <option value="15">15天</option>
+                    <option value="30">30天</option>
+                  </select>
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={copyInviteLink}>
+                    复制链接
+                  </button>
+                  <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={saveInviteExpiry}>
+                    保存有效期
+                  </button>
+                  {invite ? (
+                    <button
+                      className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50"
+                      onClick={() =>
+                        toggleInvite(
+                          invite.id,
+                          !Boolean(invite.isActive ?? true),
+                          Boolean(invite.expiresAt && new Date(invite.expiresAt) < new Date())
+                        )
+                      }
+                    >
+                      {invite.isActive === false ? "启用主链接" : "停用主链接"}
+                    </button>
+                  ) : null}
+                </div>
+                  </>
+                ) : null}
               </div>
             </div>
           </div>
