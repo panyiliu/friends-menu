@@ -20,6 +20,7 @@ type BackupDish = {
   categoryName: string;
   categorySortOrder: number;
   images: string[];
+  imageSources?: string[];
 };
 
 function safeFolderName(input: string) {
@@ -55,6 +56,44 @@ function toLocalUploadPath(input: string) {
   return "";
 }
 
+function extFromUrl(raw: string) {
+  try {
+    const u = new URL(raw, "http://localhost");
+    const ext = path.extname(u.pathname || "").toLowerCase();
+    if (ext) return ext;
+  } catch {
+    // ignore
+  }
+  return ".jpg";
+}
+
+async function loadImageFromSource(raw: string, publicDir: string): Promise<Buffer | null> {
+  const src = String(raw || "").trim();
+  if (!src) return null;
+
+  const localPath = toLocalUploadPath(src);
+  if (localPath) {
+    const fsPath = path.join(publicDir, localPath.replace(/^\//, ""));
+    try {
+      return await fs.readFile(fsPath);
+    } catch {
+      // continue to remote fetch fallback
+    }
+  }
+
+  if (/^https?:\/\//i.test(src)) {
+    try {
+      const res = await fetch(src, { cache: "no-store" });
+      if (!res.ok) return null;
+      const arr = await res.arrayBuffer();
+      return Buffer.from(arr);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   if (!ensureAdmin(req)) return NextResponse.json({ ok: false }, { status: 401 });
   try {
@@ -83,7 +122,10 @@ export async function GET(req: NextRequest) {
       if (!dishFolder) continue;
 
       const imagePaths: string[] = [];
+      const imageSources: string[] = [];
       for (const image of dish.images) {
+        const rawUrl = String(image.url || "").trim();
+        if (rawUrl) imageSources.push(rawUrl);
         const normalized = toLocalUploadPath(String(image.url || ""));
         if (!normalized) continue;
         const fsPath = path.join(publicDir, normalized.replace(/^\//, ""));
@@ -111,6 +153,7 @@ export async function GET(req: NextRequest) {
         categoryName: dish.category?.name || "未分类",
         categorySortOrder: Number(dish.category?.sortOrder || 0),
         images: imagePaths,
+        imageSources,
       };
       dishFolder.file("dish.json", JSON.stringify(meta, null, 2));
     }
@@ -210,14 +253,27 @@ export async function POST(req: NextRequest) {
           : await tx.dish.create({ data: dishData });
 
         const imageRelPaths = Array.isArray(meta.images) ? meta.images : [];
+        const imageSources = Array.isArray(meta.imageSources) ? meta.imageSources.map((x) => String(x || "").trim()).filter(Boolean) : [];
         const restoredUrls: string[] = [];
+        const sourcePublicDir = path.join(process.cwd(), "public");
         for (const relPath of imageRelPaths) {
           const zipPath = toPosix(path.join(dir, String(relPath || "")));
           const fileInZip = zip.file(zipPath);
           if (!fileInZip) {
-            const fallbackUrl = String(relPath || "").trim();
-            if (fallbackUrl.startsWith("/api/uploads/") || fallbackUrl.startsWith("/uploads/")) {
-              restoredUrls.push(fallbackUrl);
+            const source = imageSources[restoredUrls.length] || String(relPath || "").trim();
+            const fileBytes = await loadImageFromSource(source, sourcePublicDir);
+            if (fileBytes) {
+              const ext = extFromUrl(source);
+              const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
+              const target = path.join(publicUploadsDir, filename);
+              await fs.writeFile(target, fileBytes, { flush: true });
+              restoredUrls.push(`/api/uploads/${encodeURIComponent(filename)}`);
+              imageCount += 1;
+            } else {
+              const fallbackUrl = String(source || "").trim();
+              if (fallbackUrl.startsWith("/api/uploads/") || fallbackUrl.startsWith("/uploads/")) {
+                restoredUrls.push(fallbackUrl);
+              }
             }
             continue;
           }
@@ -228,6 +284,19 @@ export async function POST(req: NextRequest) {
           await fs.writeFile(target, fileBytes, { flush: true });
           restoredUrls.push(`/api/uploads/${encodeURIComponent(filename)}`);
           imageCount += 1;
+        }
+
+        if (imageRelPaths.length === 0 && imageSources.length > 0) {
+          for (const source of imageSources) {
+            const fileBytes = await loadImageFromSource(source, sourcePublicDir);
+            if (!fileBytes) continue;
+            const ext = extFromUrl(source);
+            const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
+            const target = path.join(publicUploadsDir, filename);
+            await fs.writeFile(target, fileBytes, { flush: true });
+            restoredUrls.push(`/api/uploads/${encodeURIComponent(filename)}`);
+            imageCount += 1;
+          }
         }
 
         if (restoredUrls.length > 0) {
