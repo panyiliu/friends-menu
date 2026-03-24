@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  DONE
+}
+
+model AdminUser {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String
+  sortOrder Int      @default(0)
+  isEnabled Boolean  @default(true)
+  dishes    Dish[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Dish {
+  id          String     @id @default(cuid())
+  name        String
+  englishName String     @default("")
+  tags        String     @default("")
+  description String
+  method      String
+  ingredients String
+  seasonings  String
+  price       Float
+  isPublished Boolean    @default(true)
+  isAvailable Boolean    @default(true)
+  categoryId  String
+  category    Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  images      DishImage[]
+  orderItems  OrderItem[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model DishImage {
+  id        String   @id @default(cuid())
+  dishId    String
+  dish      Dish     @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  url       String
+  isCover   Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model InviteLink {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  label     String   @default("")
+  isActive  Boolean  @default(true)
+  showPrice Boolean  @default(false)
+  welcomeEnabled         Boolean @default(true)
+  welcomeTitle           String  @default("欢迎光临")
+  welcomeSubtitle        String  @default("请开始点餐")
+  welcomeButtonText      String  @default("开始点餐")
+  welcomeFontSize        String  @default("md")
+  welcomeFontWeight      String  @default("semibold")
+  welcomeTextAlign       String  @default("center")
+  welcomeButtonColor     String  @default("#111827")
+  welcomeBackdropOpacity Int     @default(35)
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+}
+
+model GuestProfile {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  orders    Order[]
+}
+
+model Order {
+  id        String       @id @default(cuid())
+  inviteId  String?
+  invite    InviteLink?  @relation(fields: [inviteId], references: [id], onDelete: SetNull)
+  guestId   String
+  guest     GuestProfile @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  note      String
+  eta       String       @default("")
+  status    OrderStatus  @default(PENDING)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @default(now()) @updatedAt
+  items     OrderItem[]
+}
+
+model OrderItem {
+  id       String @id @default(cuid())
+  orderId  String
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  dishId   String
+  dish     Dish   @relation(fields: [dishId], references: [id], onDelete: Restrict)
+  quantity Int
+}
+
+model SystemSetting {
+  id             String   @id @default(cuid())
+  activeInviteId String?
+  adminTitle     String   @default("点餐系统")
+  guestTitle     String   @default("朋友·聚")
+  guestSubtitle  String   @default("欢聚时刻 · 臻选风味")
+  guestBannerUrl String   @default("")
+  welcomeAlwaysShow Boolean @default(false)
+  refreshIntervalSec Int  @default(8)
+  emailEnabled    Boolean @default(false)
+  emailSender     String?
+  emailPassword   String?
+  emailReceiver   String?
+  smtpServer      String? @default("smtp.qq.com")
+  smtpPort        Int?    @default(587)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}

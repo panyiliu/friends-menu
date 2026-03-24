@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    container_name: friends-menu
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=file:./prisma/dev.db
+    restart: unless-stopped
+    volumes:
+      - ./prisma:/app/prisma
+      - ./public/uploads:/app/public/uploads
