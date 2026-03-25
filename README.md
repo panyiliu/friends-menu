@@ -164,21 +164,15 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-首次部署、宿主机 `prisma` 目录为空或尚无表结构时，在容器内执行迁移（镜像内已带 Prisma CLI）：
+首次启动会在容器入口自动执行：
+- `prisma migrate deploy`（保证表结构就绪）
+- 当数据库为空时自动执行一次 seed（创建默认管理员等初始数据）
 
-```bash
-docker compose exec app npx prisma migrate deploy
-```
-
-需要默认管理员账号时（仅当数据库为空、可执行 seed 时）：
-
-```bash
-docker compose exec app npm run prisma:seed
-```
+普通用户默认不需要手动再执行 migrate/seed。若想禁用自动 seed，可在 `.env` 里设置 `AUTO_SEED_IF_EMPTY=false`。
 
 浏览器访问 **`http://<服务器IP>:<HOST_PORT>`**（默认 5223），后台 **`/admin/login`**，默认账号见上文「默认账号」。
 
-升级新版本：在同一目录 **`git pull`** 后执行 **`docker compose up -d --build`**，再视需要执行 **`npx prisma migrate deploy`**。数据仍在挂载目录中。
+升级新版本：在同一目录 **`git pull`** 后执行 **`docker compose up -d --build`**。数据仍在挂载目录中。
 
 ### 本地打包运行
 
@@ -196,7 +190,8 @@ docker compose up -d --build
 - 这两个目录属于运行数据，不建议再通过 Git 传输与合并。
 - 容器内数据库连接使用绝对路径：`file:/app/prisma/dev.db`，可避免某些环境下相对路径导致的“Unable to open the database file”。
 - 后台登录 cookie 的 `Secure` 开关由 `ADMIN_SESSION_SECURE` 控制；HTTP 内网访问请设为 `false`，HTTPS 域名访问可设为 `true`。
-- 默认 compose 已内置 `ADMIN_SESSION_SECURE=true` 与安全密钥占位值，拉取后可直接启动；建议尽快在服务器环境变量中覆盖为你自己的强密钥。
+- 默认 compose 为新手场景内置 `ADMIN_SESSION_SECURE=false`（便于 HTTP 直连）。若上生产 HTTPS，请改成 `true`。
+- 启动入口会自动执行 `migrate deploy`；空库时自动 seed，一般无需再手工执行初始化命令。
 - 公网部署建议使用独立反向代理（Nginx/Caddy）终止 HTTPS，并将 `ADMIN_SESSION_SECURE=true`。
 - 健康检查接口：`/api/health`（建议配置到反代或容器探活）。
 - **ZIP 备份/恢复** 经 Nginx 时，请增大请求体上限，例如：`client_max_body_size 64m;`（或更大），否则大 ZIP 上传会失败；Next 侧已配置 `experimental.proxyClientMaxBodySize` 为 50mb。
@@ -209,6 +204,7 @@ ADMIN_SESSION_SECRET=请替换为至少24位随机串
 ADMIN_SESSION_SECURE=true
 DATABASE_URL=file:/app/prisma/dev.db
 REQUIRE_NON_DEFAULT_ADMIN_PASSWORD=false
+AUTO_SEED_IF_EMPTY=true
 # 可选：ZIP 恢复时容器内拉取图片
 # PUBLIC_SITE_URL=https://你的域名
 # INTERNAL_BASE_URL=http://127.0.0.1:3000

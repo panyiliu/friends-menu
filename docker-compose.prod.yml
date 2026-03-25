@@ -1,13 +1,17 @@
 services:
   app:
     build: .
-    container_name: friends-menu
+    container_name: ${CONTAINER_NAME:-friends-menu}
     ports:
-      - "5223:3000"
+      - "${HOST_PORT:-5223}:3000"
     environment:
       - DATABASE_URL=file:/app/prisma/dev.db
       - ADMIN_SESSION_SECURE=true
       - ADMIN_SESSION_SECRET=${ADMIN_SESSION_SECRET}
+      - REQUIRE_NON_DEFAULT_ADMIN_PASSWORD=${REQUIRE_NON_DEFAULT_ADMIN_PASSWORD:-false}
+      - AUTO_SEED_IF_EMPTY=${AUTO_SEED_IF_EMPTY:-true}
+      - PUBLIC_SITE_URL=${PUBLIC_SITE_URL:-}
+      - INTERNAL_BASE_URL=${INTERNAL_BASE_URL:-}
     restart: unless-stopped
     volumes:
       - ./prisma:/app/prisma

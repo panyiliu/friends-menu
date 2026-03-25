@@ -14,6 +14,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:safe": "node scripts/pre-migrate-backup.cjs && prisma migrate dev",
     "prisma:seed": "node prisma/seed.cjs",
+    "prisma:seed:if-empty": "node scripts/seed-if-empty.cjs",
     "restore": "node scripts/restore.cjs",
     "stress:test": "node scripts/stress-orders.cjs"
   },
