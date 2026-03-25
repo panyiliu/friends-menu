@@ -156,6 +156,7 @@ export default function AdminPage() {
   const [resetPwDrafts, setResetPwDrafts] = useState<Record<string, { newPw: string; confirm: string }>>({});
   const [authedChecked, setAuthedChecked] = useState(false);
   const [debugUi, setDebugUi] = useState(false);
+  const [backendVersion, setBackendVersion] = useState<{ gitSha: string; buildTime: string } | null>(null);
 
   const statusText = (status: Order["status"]) => (status === "PENDING" ? "待备餐" : status === "PREPARING" ? "备餐中" : "已完成");
   const inviteLink = useMemo(() => (invite?.token ? `${globalThis.location?.origin || ""}/menu/${invite.token}` : ""), [invite]);
@@ -260,6 +261,24 @@ export default function AdminPage() {
       clearInterval(timer);
     };
   }, [refresh, tab, settings.refreshIntervalSec]);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch("/api/version", { cache: "no-store" });
+        const d = await safeJson(res);
+        if (d?.ok) {
+          setBackendVersion({
+            gitSha: String(d.gitSha || "unknown"),
+            buildTime: String(d.buildTime || ""),
+          });
+        }
+      } catch {
+        // Ignore version fetch errors; core admin functions should still work.
+      }
+    };
+    void load();
+  }, []);
 
   useEffect(() => {
     if (!recentSavedDishId) return;
@@ -859,6 +878,11 @@ export default function AdminPage() {
         <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-full bg-orange-100/60 blur-2xl" />
         <h1 className="bg-gradient-to-r from-stone-800 via-amber-700 to-orange-600 bg-clip-text text-3xl font-black tracking-tight text-transparent">{settings.adminTitle || "点餐系统"}</h1>
         <p className="mt-1 text-xs text-stone-500">后厨管理控制台 · 臻选风味</p>
+        <p className="mt-1 text-[11px] text-stone-400">
+          {backendVersion
+            ? `后端版本：${backendVersion.gitSha} · ${backendVersion.buildTime.slice(0, 19).replace("T", " ")}`
+            : "后端版本：加载中..."}
+        </p>
         <div className="mt-3 flex flex-wrap gap-2 rounded-2xl border border-stone-100 bg-white/70 p-1 backdrop-blur-sm">
           {tabs.map((t) => (
             <button key={t} className={`w-20 rounded-xl px-3 py-2 text-sm font-medium transition md:w-24 ${tab === t ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-700 hover:bg-zinc-50"}`} onClick={() => setTab(t)}>
