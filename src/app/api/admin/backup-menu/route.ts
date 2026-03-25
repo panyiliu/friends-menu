@@ -135,19 +135,26 @@ async function loadImageFromSource(raw: string, publicDir: string): Promise<Buff
 function findZipFileByPath(zip: JSZip, preferredPath: string, dir: string) {
   const preferred = normalizeZipRelPath(preferredPath);
   const full = normalizeZipRelPath(path.join(dir, preferred));
-  const candidates = [full, preferred].filter(Boolean);
+  const candidates = [full, preferred].filter(Boolean).map((x) => normalizeZipRelPath(x).toLowerCase());
+  const files = Object.values(zip.files).filter((f) => !f.dir);
 
-  for (const p of candidates) {
-    const exact = zip.file(p);
+  // 1) 完全路径匹配（对 zip 实际文件名先做标准化，兼容 Windows 压缩包里的反斜杠）。
+  for (const c of candidates) {
+    const exact = files.find((f) => normalizeZipRelPath(f.name).toLowerCase() === c);
     if (exact) return exact;
-    const lower = p.toLowerCase();
-    const ci = Object.values(zip.files).find((f) => !f.dir && f.name.toLowerCase() === lower);
-    if (ci) return ci;
   }
 
-  const basename = path.basename(preferred).toLowerCase();
+  // 2) 末尾路径匹配（兼容多一层根目录，如 2222/xxx/images/a.jpg）。
+  for (const c of candidates) {
+    const suffix = `/${c}`;
+    const end = files.find((f) => normalizeZipRelPath(f.name).toLowerCase().endsWith(suffix));
+    if (end) return end;
+  }
+
+  // 3) 仅文件名匹配（兜底）。
+  const basename = path.posix.basename(preferred).toLowerCase();
   if (basename) {
-    const fallback = Object.values(zip.files).find((f) => !f.dir && path.basename(f.name).toLowerCase() === basename);
+    const fallback = files.find((f) => path.posix.basename(normalizeZipRelPath(f.name)).toLowerCase() === basename);
     if (fallback) return fallback;
   }
   return null;
