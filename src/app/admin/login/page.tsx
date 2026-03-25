@@ -12,9 +12,20 @@ export default function AdminLoginPage() {
   const [logOpen, setLogOpen] = useState(true);
   const [logLines, setLogLines] = useState<string[]>([]);
   const [sessionRechecking, setSessionRechecking] = useState(true);
+  const [debugEnabled, setDebugEnabled] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/public/debug-config", { cache: "no-store" });
+        const data = (await res.json()) as { ok?: boolean; debugUiEnabled?: boolean };
+        if (!cancelled) setDebugEnabled(Boolean(data?.debugUiEnabled));
+      } catch {
+        if (!cancelled) setDebugEnabled(false);
+      }
+    })();
+
     (async () => {
       try {
         const res = await fetch("/api/admin/session", { credentials: "include", cache: "no-store" });
@@ -35,9 +46,10 @@ export default function AdminLoginPage() {
   }, []);
 
   const log = useCallback((line: string) => {
+    if (!debugEnabled) return;
     const ts = new Date().toLocaleTimeString();
     setLogLines((prev) => [...prev.slice(-(MAX_LOG - 1)), `[${ts}] ${line}`]);
-  }, []);
+  }, [debugEnabled]);
 
   async function submit() {
     setMessage("");
@@ -118,28 +130,29 @@ export default function AdminLoginPage() {
       >
         {busy ? "登录中…" : "登录"}
       </button>
-      <p className="mt-2 text-xs text-zinc-500">默认：admin / admin123456</p>
       {message ? (
         <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">{message}</p>
       ) : null}
 
-      <div className="mt-6 border-t border-zinc-200 pt-3">
-        <button type="button" className="flex w-full items-center justify-between text-left text-sm font-medium text-zinc-700" onClick={() => setLogOpen((v) => !v)}>
-          <span>登录诊断日志（每步自动记录）</span>
-          <span className="text-zinc-400">{logOpen ? "收起" : "展开"}</span>
-        </button>
-        {logOpen ? (
-          <div className="mt-2 max-h-56 overflow-auto rounded-md border border-zinc-200 bg-zinc-950 p-2 font-mono text-[11px] leading-relaxed text-emerald-200/90">
-            {logLines.length === 0 ? <span className="text-zinc-500">提交登录后将在此显示步骤与 HTTP 状态</span> : null}
-            {logLines.map((line, i) => (
-              <div key={i} className="whitespace-pre-wrap break-all">
-                {line}
-              </div>
-            ))}
-          </div>
-        ) : null}
-        <p className="mt-2 text-[11px] text-zinc-400">设置里另有「调试日志面板」开关，可记录全站 fetch；此处仅针对登录流程。</p>
-      </div>
+      {debugEnabled ? (
+        <div className="mt-6 border-t border-zinc-200 pt-3">
+          <button type="button" className="flex w-full items-center justify-between text-left text-sm font-medium text-zinc-700" onClick={() => setLogOpen((v) => !v)}>
+            <span>登录诊断日志（每步自动记录）</span>
+            <span className="text-zinc-400">{logOpen ? "收起" : "展开"}</span>
+          </button>
+          {logOpen ? (
+            <div className="mt-2 max-h-56 overflow-auto rounded-md border border-zinc-200 bg-zinc-950 p-2 font-mono text-[11px] leading-relaxed text-emerald-200/90">
+              {logLines.length === 0 ? <span className="text-zinc-500">提交登录后将在此显示步骤与 HTTP 状态</span> : null}
+              {logLines.map((line, i) => (
+                <div key={i} className="whitespace-pre-wrap break-all">
+                  {line}
+                </div>
+              ))}
+            </div>
+          ) : null}
+          <p className="mt-2 text-[11px] text-zinc-400">当前由后台「系统设置 → 显示调试日志面板」统一控制。</p>
+        </div>
+      ) : null}
     </main>
   );
 }

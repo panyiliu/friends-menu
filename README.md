@@ -72,6 +72,7 @@ npm run start:prod
 ## 默认账号
 
 - 后台地址：`/admin/login`
+- 登录页不展示默认密码（请在本手册查看）
 - 默认账号：`admin`
 - 默认密码：`admin123456`
 

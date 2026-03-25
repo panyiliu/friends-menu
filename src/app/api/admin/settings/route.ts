@@ -30,6 +30,7 @@ export async function PUT(req: NextRequest) {
     let setting = await prisma.systemSetting.findFirst();
     if (!setting) setting = await prisma.systemSetting.create({ data: {} });
     const fullData = {
+      debugUiEnabled: Boolean(body.debugUiEnabled),
       adminTitle: body.adminTitle || "点餐系统",
       guestTitle: body.guestTitle || "朋友·聚",
       guestSubtitle: body.guestSubtitle || "欢聚时刻 · 臻选风味",

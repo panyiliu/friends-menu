@@ -1,17 +1,17 @@
 "use client";
 
-import { appendClientDebugLine, clearClientDebugLog, getClientDebugLogText, isDebugUiEnabled } from "@/lib/client-debug-log";
+import { appendClientDebugLine, clearClientDebugLog, getClientDebugLogText } from "@/lib/client-debug-log";
 import { useCallback, useEffect, useState } from "react";
 
 type Props = {
   /** 已登录时可拉取服务端环状日志 */
   fetchServerLogs?: boolean;
-  /** 不传则从 localStorage 读取 */
+  /** 由后台统一开关控制 */
   enabled?: boolean;
 };
 
 export function DebugLogPanel({ fetchServerLogs, enabled }: Props) {
-  const on = enabled ?? isDebugUiEnabled();
+  const on = Boolean(enabled);
   const [open, setOpen] = useState(true);
   const [text, setText] = useState("");
   const [serverLines, setServerLines] = useState<string[]>([]);

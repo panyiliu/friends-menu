@@ -115,6 +115,7 @@ model OrderItem {
 model SystemSetting {
   id             String   @id @default(cuid())
   activeInviteId String?
+  debugUiEnabled Boolean  @default(false)
   adminTitle     String   @default("点餐系统")
   guestTitle     String   @default("朋友·聚")
   guestSubtitle  String   @default("欢聚时刻 · 臻选风味")

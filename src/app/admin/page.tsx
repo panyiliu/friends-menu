@@ -1,7 +1,6 @@
 "use client";
 
 import { DebugLogPanel } from "@/components/DebugLogPanel";
-import { isDebugUiEnabled, setDebugUiEnabled } from "@/lib/client-debug-log";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -44,6 +43,7 @@ type Invite = {
   showPrice?: boolean;
 } & Partial<WelcomeTemplate>;
 type Settings = {
+  debugUiEnabled?: boolean;
   adminTitle?: string;
   guestTitle?: string;
   guestSubtitle?: string;
@@ -109,6 +109,7 @@ export default function AdminPage() {
   const [newInviteShowPrice, setNewInviteShowPrice] = useState(false);
   const [newInviteTemplate, setNewInviteTemplate] = useState<WelcomeTemplate>(defaultWelcomeTemplate);
   const [settings, setSettings] = useState<Settings>({
+    debugUiEnabled: false,
     adminTitle: "点餐系统",
     guestTitle: "朋友·聚",
     guestSubtitle: "欢聚时刻 · 臻选风味",
@@ -157,11 +158,6 @@ export default function AdminPage() {
   const [resetAdminNewPassword, setResetAdminNewPassword] = useState("");
   const [authedChecked, setAuthedChecked] = useState(false);
   const [debugUi, setDebugUi] = useState(false);
-  useEffect(() => {
-    // 与 localStorage 对齐；仅在挂载时同步一次
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 需从 localStorage 恢复开关
-    setDebugUi(isDebugUiEnabled());
-  }, []);
 
   const statusText = (status: Order["status"]) => (status === "PENDING" ? "待备餐" : status === "PREPARING" ? "备餐中" : "已完成");
   const inviteLink = useMemo(() => (invite?.token ? `${globalThis.location?.origin || ""}/menu/${invite.token}` : ""), [invite]);
@@ -221,6 +217,7 @@ export default function AdminPage() {
     setInviteExpiresAt(i.active?.expiresAt ? String(i.active.expiresAt).slice(0, 16) : "");
     if (s.ok && !isEditingSettings) {
       setSettings({
+        debugUiEnabled: Boolean(s.setting.debugUiEnabled),
         adminTitle: s.setting.adminTitle || "点餐系统",
         guestTitle: s.setting.guestTitle || "朋友·聚",
         guestSubtitle: s.setting.guestSubtitle || "欢聚时刻 · 臻选风味",
@@ -234,6 +231,7 @@ export default function AdminPage() {
         smtpServer: s.setting.smtpServer || "smtp.qq.com",
         smtpPort: s.setting.smtpPort || 587,
       });
+      setDebugUi(Boolean(s.setting.debugUiEnabled));
     }
     if (u.ok) setAdminUsers(u.users || []);
   }, [isEditingSettings, orderFilterFrom, orderFilterName, orderFilterStatus, orderFilterTo]);
@@ -1455,10 +1453,11 @@ export default function AdminPage() {
                 onChange={(e) => {
                   const v = e.target.checked;
                   setDebugUi(v);
-                  setDebugUiEnabled(v);
+                  setSettings((prev) => ({ ...prev, debugUiEnabled: v }));
+                  setIsEditingSettings(true);
                 }}
               />
-              <span>显示调试日志面板（全站生效，记录客户端请求；后台页额外展示服务端近期日志）。开关保存在本浏览器，也可通过 URL 参数 `?debug=1` 快速开启。</span>
+              <span>显示调试日志面板（全站生效，记录客户端请求；后台页额外展示服务端近期日志）。</span>
             </label>
             <button type="button" className="mt-2 flex w-full items-center justify-between rounded-xl border border-zinc-200 px-3 py-2 text-left text-sm hover:bg-zinc-50" onClick={() => setShowLowFrequencySettings((v) => !v)}>
               <span className="font-medium">低频区（邮件）</span>

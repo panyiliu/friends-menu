@@ -1,24 +1,25 @@
 "use client";
 
 import { DebugLogPanel } from "@/components/DebugLogPanel";
-import { appendClientDebugLine, isDebugUiEnabled, setDebugUiEnabled } from "@/lib/client-debug-log";
 import { useEffect, useState } from "react";
 
 export function GlobalDebugPanelMount() {
   const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
-    const url = new URL(window.location.href);
-    const flag = url.searchParams.get("debug");
-    if (flag === "1") {
-      setDebugUiEnabled(true);
-      appendClientDebugLine("debug mode enabled by query param debug=1");
-    } else if (flag === "0") {
-      setDebugUiEnabled(false);
-      appendClientDebugLine("debug mode disabled by query param debug=0");
-    }
-    const t = window.setTimeout(() => setEnabled(isDebugUiEnabled()), 0);
-    return () => clearTimeout(t);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/public/debug-config", { cache: "no-store" });
+        const data = (await res.json()) as { ok?: boolean; debugUiEnabled?: boolean };
+        if (!cancelled) setEnabled(Boolean(data?.debugUiEnabled));
+      } catch {
+        if (!cancelled) setEnabled(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (!enabled) return null;
