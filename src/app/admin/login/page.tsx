@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 
 const MAX_LOG = 50;
+/** 仅在会话检测超过此时间仍无结果时显示「正在检测」，避免闪烁与 Strict Mode 双次执行带来的干扰 */
+const SESSION_CHECK_UI_DELAY_MS = 200;
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState("admin");
@@ -11,11 +13,16 @@ export default function AdminLoginPage() {
   const [busy, setBusy] = useState(false);
   const [logOpen, setLogOpen] = useState(true);
   const [logLines, setLogLines] = useState<string[]>([]);
-  const [sessionRechecking, setSessionRechecking] = useState(true);
+  const [sessionRechecking, setSessionRechecking] = useState(false);
   const [debugEnabled, setDebugEnabled] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    const ac = new AbortController();
+    const showTimer = globalThis.setTimeout(() => {
+      if (!cancelled) setSessionRechecking(true);
+    }, SESSION_CHECK_UI_DELAY_MS);
+
     (async () => {
       try {
         const res = await fetch("/api/public/debug-config", { cache: "no-store" });
@@ -28,20 +35,30 @@ export default function AdminLoginPage() {
 
     (async () => {
       try {
-        const res = await fetch("/api/admin/session", { credentials: "include", cache: "no-store" });
+        const res = await fetch("/api/admin/session", {
+          credentials: "include",
+          cache: "no-store",
+          signal: ac.signal,
+        });
         if (cancelled) return;
         if (res.ok) {
           window.location.replace("/admin");
           return;
         }
-      } catch {
-        /* 忽略，留在登录页 */
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        /* 忽略其它错误，留在登录页 */
       } finally {
+        globalThis.clearTimeout(showTimer);
         if (!cancelled) setSessionRechecking(false);
       }
     })();
+
     return () => {
       cancelled = true;
+      ac.abort();
+      globalThis.clearTimeout(showTimer);
+      setSessionRechecking(false);
     };
   }, []);
 
@@ -88,7 +105,7 @@ export default function AdminLoginPage() {
       if (sess.status !== 200) {
         log(`会话校验失败，响应：${sessText.slice(0, 200).replace(/\s+/g, " ")}`);
         setMessage(
-          "密码校验已通过，但浏览器未带上有效会话。请检查：① 使用 HTTP 访问时把环境变量 ADMIN_SESSION_SECURE 设为 false；② Docker/生产需在反代上传 X-Forwarded-Proto；③ 勿禁用第三方 Cookie（本站为同站，一般无需）。详情见 docs/product-auth.md。",
+          "密码校验已通过，但浏览器未带上有效会话。请检查：① Docker/生产需在反代上传 X-Forwarded-Proto；② 勿禁用第三方 Cookie（本站为同站，一般无需）。详情见 docs/product-auth.md。",
         );
         return;
       }

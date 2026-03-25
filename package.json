@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:webpack": "next dev --webpack",
     "dev:5223": "next dev -p 5223",
     "build": "next build",
     "prestart": "node scripts/check-next-build.cjs",

@@ -17,9 +17,4 @@ export function assertProdSecurityEnv() {
 
   const db = process.env.DATABASE_URL || "";
   if (!db) invalid("DATABASE_URL 缺失");
-
-  const secure = process.env.ADMIN_SESSION_SECURE;
-  if (secure !== "true") {
-    invalid("生产环境必须设置 ADMIN_SESSION_SECURE=true（HTTPS）");
-  }
 }

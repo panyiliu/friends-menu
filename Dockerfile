@@ -11,11 +11,15 @@ COPY . .
 RUN npm run prisma:generate && npm run build
 
 FROM node:20-alpine AS runner
+ARG GIT_SHA=unknown
+ARG BUILD_TIME=
 WORKDIR /app
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 ENV DATABASE_URL=file:/app/prisma/dev.db
+ENV GIT_SHA=${GIT_SHA}
+ENV BUILD_TIME=${BUILD_TIME}
 
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules

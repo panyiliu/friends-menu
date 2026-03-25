@@ -155,6 +155,7 @@ export default function AdminPage() {
   /** 按用户名重置密码：新密码与确认 */
   const [resetPwDrafts, setResetPwDrafts] = useState<Record<string, { newPw: string; confirm: string }>>({});
   const [authedChecked, setAuthedChecked] = useState(false);
+  const redirectingRef = useRef(false);
   const [debugUi, setDebugUi] = useState(false);
   const [backendVersion, setBackendVersion] = useState<{ gitSha: string; buildTime: string } | null>(null);
 
@@ -189,8 +190,11 @@ export default function AdminPage() {
   };
 
   async function ensureAuthedOrRedirect() {
-    const res = await fetch("/api/admin/session");
+    // 避免瀏覽器/框架快取導致 session 檢測結果不一致
+    const res = await fetch("/api/admin/session", { cache: "no-store" });
+    if (redirectingRef.current) return false;
     if (res.status === 401) {
+      redirectingRef.current = true;
       location.href = "/admin/login";
       return false;
     }
@@ -253,7 +257,10 @@ export default function AdminPage() {
     }, 0);
     const timer = setInterval(async () => {
       const ok = await ensureAuthedOrRedirect();
-      if (!ok) return;
+      if (!ok) {
+        clearInterval(timer);
+        return;
+      }
       await refresh(false);
     }, Math.max(5, settings.refreshIntervalSec || 8) * 1000);
     return () => {

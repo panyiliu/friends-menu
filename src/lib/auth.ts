@@ -11,8 +11,7 @@ function sign(value: string) {
   return createHmac("sha256", secret).update(value).digest("hex");
 }
 
-function adminSessionCookieOptions() {
-  const secureCookie = process.env.ADMIN_SESSION_SECURE === "true";
+function adminSessionCookieOptions(secureCookie: boolean) {
   return {
     httpOnly: true as const,
     sameSite: "lax" as const,
@@ -33,12 +32,15 @@ export function buildAdminSessionCookieValue(username: string) {
  * 在 Route Handler 中必须把 Cookie 写到同一 `NextResponse` 上，否则部分环境下
  * `cookies().set()` 不会随 JSON 响应下发，导致登录成功但 `/api/admin/session` 仍 401。
  */
-export function applyAdminSessionCookie(response: NextResponse, username: string) {
-  response.cookies.set(COOKIE_NAME, buildAdminSessionCookieValue(username), adminSessionCookieOptions());
+export function applyAdminSessionCookie(response: NextResponse, username: string, secureCookie: boolean) {
+  // NOTE: Secure cookie 需要依照「當前請求是否為 HTTPS」決定，
+  // 這樣才能同時支援 HTTP/IP 直連與 HTTPS/域名存取。
+  response.cookies.set(COOKIE_NAME, buildAdminSessionCookieValue(username), adminSessionCookieOptions(secureCookie));
 }
 
-export async function setAdminSession(username: string) {
-  (await cookies()).set(COOKIE_NAME, buildAdminSessionCookieValue(username), adminSessionCookieOptions());
+export async function setAdminSession(username: string, secureCookie = false) {
+  // 未提供 request 協定資訊時，預設走非 Secure 以確保 HTTP/IP 直連可用。
+  (await cookies()).set(COOKIE_NAME, buildAdminSessionCookieValue(username), adminSessionCookieOptions(secureCookie));
 }
 
 export async function clearAdminSession() {

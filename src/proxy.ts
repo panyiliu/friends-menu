@@ -4,16 +4,12 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 /**
- * 与 API 层 `ensureAdmin` 一致的会话判断（含非生产环境下 Edge/Node 密钥不一致时的宽松策略）。
+ * 与 API 层 `ensureAdmin` 一致的会话判断（严格验签）。
  */
 async function isAdminSessionOk(req: NextRequest): Promise<boolean> {
   const secret = process.env.ADMIN_SESSION_SECRET || "dev-secret";
   const token = req.cookies.get("admin_session")?.value;
   let sessionOk = await verifyAdminSessionToken(token, secret);
-
-  if (!sessionOk && process.env.NODE_ENV !== "production" && token && token.includes(".")) {
-    sessionOk = true;
-  }
 
   return sessionOk;
 }
@@ -30,10 +26,9 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // 不在網關階段對 `/admin/login` 做服務端 redirect。
+  // 由登入頁的客戶端一次性檢測決定是否跳轉，可避免在輸入帳密時因 session 判斷差異造成反覆跳動。
   if (pathname === "/admin/login") {
-    if (await isAdminSessionOk(req)) {
-      return NextResponse.redirect(new URL("/admin", req.url));
-    }
     return NextResponse.next();
   }
 
