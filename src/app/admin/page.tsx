@@ -148,7 +148,7 @@ export default function AdminPage() {
   const [isDeletingDish, setIsDeletingDish] = useState(false);
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [showPrimaryInviteCard, setShowPrimaryInviteCard] = useState(false);
-  const [settingsSubTab, setSettingsSubTab] = useState<"links" | "categories" | "backup" | "email" | "system">("links");
+  const [settingsSubTab, setSettingsSubTab] = useState<"links" | "categories" | "backup" | "email" | "system" | "users">("links");
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [newAdminUsername, setNewAdminUsername] = useState("");
   const [newAdminPassword, setNewAdminPassword] = useState("");
@@ -1207,6 +1207,7 @@ export default function AdminPage() {
             <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "backup" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("backup")}>备份管理</button>
             <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "email" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("email")}>邮件设置</button>
             <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "system" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("system")}>系统设置</button>
+            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "users" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("users")}>用户管理</button>
           </div>
           <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "links" ? "" : "hidden"}`}>
             <h2 className="font-semibold">点餐链接管理</h2>
@@ -1758,7 +1759,9 @@ export default function AdminPage() {
                 保存系统设置
               </button>
             </div>
-
+          </div>
+          <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "users" ? "" : "hidden"}`}>
+            <h2 className="font-semibold">用户管理</h2>
             <div className="mt-8 border-t border-zinc-200 pt-6">
               <h3 className="font-semibold">修改后台密码</h3>
               <form className="mt-2 space-y-2" action={changePassword}>
