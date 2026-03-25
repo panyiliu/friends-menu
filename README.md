@@ -23,6 +23,8 @@
 
 ## 本地启动
 
+**重要：日常开发请始终用 `npm run dev`。不要直接 `npm run start`——`start` 是生产服务器，必须先 `npm run build`，否则会报错 `production-start-no-build-id`。**
+
 1) 安装依赖
 
 ```bash
@@ -36,13 +38,36 @@ npx prisma migrate dev --name init
 npm run prisma:seed
 ```
 
-3) 启动开发环境
+3) 启动开发环境（推荐）
 
 ```bash
 npm run dev
 ```
 
-打开 `http://localhost:5223`
+默认监听 **`http://localhost:3000`**。若需与 Docker 宿主机端口一致（5223），可执行：
+
+```bash
+npm run dev:5223
+```
+
+（等价于 `npx next dev -p 5223`。）
+
+4) 生产模式本地验证（可选）
+
+先构建再启动（两条命令）：
+
+```bash
+npm run build
+npm run start
+```
+
+或一条命令：
+
+```bash
+npm run start:prod
+```
+
+设计与部署说明见 [`docs/product-auth.md`](docs/product-auth.md)、[`docs/tech-auth.md`](docs/tech-auth.md)。
 
 ## 默认账号
 
@@ -94,10 +119,46 @@ npm run dev
 ## 压测脚本（10-30人）
 
 - 命令：`npm run stress:test -- <token> [count] [baseUrl]`
-- 示例：`npm run stress:test -- abcdef123456 30 http://localhost:5223`
+- 示例：`npm run stress:test -- abcdef123456 30 http://localhost:3000`（端口按你本地实际为准）
 - 用途：快速模拟多人并发下单，验证成功率与后台刷新表现。
 
 ## Docker 部署
+
+### 全新服务器（已安装 Git、Docker、Docker Compose）
+
+在服务器上选目录（示例 `/opt/friends-menu`），克隆你推送后的仓库并启动：
+
+```bash
+cd /opt
+git clone https://github.com/<你的用户名>/<仓库名>.git friends-menu
+cd friends-menu
+```
+
+**强烈建议**先设置密钥再启动（可直接写在命令前，或在本目录创建 `.env` 由 Compose 读取）：
+
+```bash
+export ADMIN_SESSION_SECRET="请改为至少24位随机字符串"
+# 仅用浏览器访问 http://IP:5223（HTTP）时，必须设为 false，否则后台 Cookie 无法登录：
+export ADMIN_SESSION_SECURE=false
+# 若前面已用 HTTPS 反代访问，改为 true 并配合 Nginx 等终止 TLS
+docker compose up -d --build
+```
+
+首次部署、宿主机 `prisma` 目录为空或尚无表结构时，在容器内执行迁移（镜像内已带 Prisma CLI）：
+
+```bash
+docker compose exec app npx prisma migrate deploy
+```
+
+需要默认管理员账号时（仅当数据库为空、可执行 seed 时）：
+
+```bash
+docker compose exec app npm run prisma:seed
+```
+
+浏览器访问 **`http://<服务器公网或内网IP>:5223`**，后台 **`/admin/login`**，默认账号见上文「默认账号」。
+
+升级新版本：在同一目录 `git pull` 后执行 `docker compose up -d --build`，再视需要执行 `npx prisma migrate deploy`。
 
 ### 本地打包运行
 
@@ -118,6 +179,8 @@ docker compose up -d --build
 - 默认 compose 已内置 `ADMIN_SESSION_SECURE=true` 与安全密钥占位值，拉取后可直接启动；建议尽快在服务器环境变量中覆盖为你自己的强密钥。
 - 公网部署建议使用独立反向代理（Nginx/Caddy）终止 HTTPS，并将 `ADMIN_SESSION_SECURE=true`。
 - 健康检查接口：`/api/health`（建议配置到反代或容器探活）。
+- **ZIP 备份/恢复** 经 Nginx 时，请增大请求体上限，例如：`client_max_body_size 64m;`（或更大），否则大 ZIP 上传会失败；Next 侧已配置 `experimental.proxyClientMaxBodySize` 为 50mb。
+- 若容器内恢复 ZIP 时需从**公网 URL** 拉取原图，可配置 `PUBLIC_SITE_URL`（对外站点根 URL）与 `INTERNAL_BASE_URL`（容器内可访问的站点根 URL，如 `http://127.0.0.1:3000`），详见 [`docs/tech-auth.md`](docs/tech-auth.md)。
 
 ### 生产环境必设变量（公网）
 
@@ -126,6 +189,9 @@ ADMIN_SESSION_SECRET=请替换为至少24位随机串
 ADMIN_SESSION_SECURE=true
 DATABASE_URL=file:/app/prisma/dev.db
 REQUIRE_NON_DEFAULT_ADMIN_PASSWORD=false
+# 可选：ZIP 恢复时容器内拉取图片
+# PUBLIC_SITE_URL=https://你的域名
+# INTERNAL_BASE_URL=http://127.0.0.1:3000
 ```
 
 说明：

@@ -1,5 +1,7 @@
 "use client";
 
+import { DebugLogPanel } from "@/components/DebugLogPanel";
+import { isDebugUiEnabled, setDebugUiEnabled } from "@/lib/client-debug-log";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -154,6 +156,12 @@ export default function AdminPage() {
   const [resetAdminUsername, setResetAdminUsername] = useState("");
   const [resetAdminNewPassword, setResetAdminNewPassword] = useState("");
   const [authedChecked, setAuthedChecked] = useState(false);
+  const [debugUi, setDebugUi] = useState(false);
+  useEffect(() => {
+    // 与 localStorage 对齐；仅在挂载时同步一次
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 需从 localStorage 恢复开关
+    setDebugUi(isDebugUiEnabled());
+  }, []);
 
   const statusText = (status: Order["status"]) => (status === "PENDING" ? "待备餐" : status === "PREPARING" ? "备餐中" : "已完成");
   const inviteLink = useMemo(() => (invite?.token ? `${globalThis.location?.origin || ""}/menu/${invite.token}` : ""), [invite]);
@@ -178,21 +186,6 @@ export default function AdminPage() {
 
   async function ensureAuthedOrRedirect() {
     const res = await fetch("/api/admin/session");
-    // #region agent log
-    fetch("http://127.0.0.1:7917/ingest/05fed06c-f8fa-4faf-9eb8-fc18d081b49e", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c4f207" },
-      body: JSON.stringify({
-        sessionId: "c4f207",
-        runId: "login-flow",
-        hypothesisId: "H5",
-        location: "admin/page.tsx:ensureAuthedOrRedirect",
-        message: "client_session_fetch",
-        data: { httpStatus: res.status },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     if (res.status === 401) {
       location.href = "/admin/login";
       return false;
@@ -1430,6 +1423,19 @@ export default function AdminPage() {
           </div>
           <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "system" ? "" : "hidden"}`}>
             <h2 className="font-semibold">系统设置</h2>
+            <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={debugUi}
+                onChange={(e) => {
+                  const v = e.target.checked;
+                  setDebugUi(v);
+                  setDebugUiEnabled(v);
+                }}
+              />
+              <span>显示调试日志面板（记录客户端请求；登录后台后包含服务端近期日志）。开关保存在本浏览器。</span>
+            </label>
             <button type="button" className="mt-2 flex w-full items-center justify-between rounded-xl border border-zinc-200 px-3 py-2 text-left text-sm hover:bg-zinc-50" onClick={() => setShowLowFrequencySettings((v) => !v)}>
               <span className="font-medium">低频区（邮件）</span>
               <span className="text-xs text-zinc-500">{showLowFrequencySettings ? "收起" : "展开"}</span>
@@ -1732,6 +1738,7 @@ export default function AdminPage() {
         </section>
       ) : null}
       </div>
+      <DebugLogPanel key={debugUi ? "dbg-on" : "dbg-off"} enabled={debugUi} fetchServerLogs />
     </main>
   );
 }

@@ -50,3 +50,4 @@ temp-restore-check/
 # runtime data (production mode: persist on host, do not track in git)
 prisma/dev.db
 public/uploads/
+/logs/

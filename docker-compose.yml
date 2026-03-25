@@ -9,6 +9,9 @@ services:
       - ADMIN_SESSION_SECURE=${ADMIN_SESSION_SECURE:-true}
       - ADMIN_SESSION_SECRET=${ADMIN_SESSION_SECRET:-replace_with_a_long_random_secret_please_change}
       - REQUIRE_NON_DEFAULT_ADMIN_PASSWORD=${REQUIRE_NON_DEFAULT_ADMIN_PASSWORD:-false}
+      # 可选：ZIP 恢复时容器内拉取原站图片（见 docs/tech-auth.md）
+      - PUBLIC_SITE_URL=${PUBLIC_SITE_URL:-}
+      - INTERNAL_BASE_URL=${INTERNAL_BASE_URL:-}
     restart: unless-stopped
     volumes:
       - ./prisma:/app/prisma

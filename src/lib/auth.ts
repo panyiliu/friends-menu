@@ -48,7 +48,9 @@ export async function clearAdminSession() {
 export async function isAdminAuthed() {
   const token = (await cookies()).get(COOKIE_NAME)?.value;
   if (!token || !token.includes(".")) return false;
-  const [payload, signature] = token.split(".");
+  const i = token.indexOf(".");
+  const payload = token.slice(0, i);
+  const signature = token.slice(i + 1);
   const expected = sign(payload);
   const a = Buffer.from(signature);
   const b = Buffer.from(expected);

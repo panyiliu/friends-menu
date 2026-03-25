@@ -67,6 +67,24 @@ function extFromUrl(raw: string) {
   return ".jpg";
 }
 
+function alternateInternalUrl(src: string): string | null {
+  const pub = process.env.PUBLIC_SITE_URL?.replace(/\/$/, "");
+  const internal = process.env.INTERNAL_BASE_URL?.replace(/\/$/, "");
+  if (!pub || !internal || !src.startsWith(pub)) return null;
+  return internal + src.slice(pub.length);
+}
+
+async function fetchRemoteImage(url: string): Promise<Buffer | null> {
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    const arr = await res.arrayBuffer();
+    return Buffer.from(arr);
+  } catch {
+    return null;
+  }
+}
+
 async function loadImageFromSource(raw: string, publicDir: string): Promise<Buffer | null> {
   const src = String(raw || "").trim();
   if (!src) return null;
@@ -82,14 +100,12 @@ async function loadImageFromSource(raw: string, publicDir: string): Promise<Buff
   }
 
   if (/^https?:\/\//i.test(src)) {
-    try {
-      const res = await fetch(src, { cache: "no-store" });
-      if (!res.ok) return null;
-      const arr = await res.arrayBuffer();
-      return Buffer.from(arr);
-    } catch {
-      return null;
+    let buf = await fetchRemoteImage(src);
+    if (!buf) {
+      const alt = alternateInternalUrl(src);
+      if (alt) buf = await fetchRemoteImage(alt);
     }
+    return buf;
   }
   return null;
 }
@@ -106,6 +122,7 @@ export async function GET(req: NextRequest) {
       "manifest.json",
       JSON.stringify(
         {
+          schemaVersion: 2,
           version: 1,
           exportedAt: new Date().toISOString(),
           dishCount: dishes.length,
@@ -172,6 +189,8 @@ export async function GET(req: NextRequest) {
   }
 }
 
+export const maxDuration = 120;
+
 export async function POST(req: NextRequest) {
   if (!ensureAdmin(req)) return NextResponse.json({ ok: false }, { status: 401 });
   try {
@@ -190,6 +209,27 @@ export async function POST(req: NextRequest) {
     const publicUploadsDir = path.join(process.cwd(), "public", "uploads");
     await fs.mkdir(publicUploadsDir, { recursive: true });
 
+    const warnings: string[] = [];
+
+    const manifestEntry = zip.file("manifest.json");
+    if (manifestEntry) {
+      try {
+        const manifestRaw = await manifestEntry.async("string");
+        const m = JSON.parse(manifestRaw) as { schemaVersion?: number; version?: number };
+        const schema = typeof m.schemaVersion === "number" ? m.schemaVersion : typeof m.version === "number" ? m.version : 1;
+        if (schema < 1 || schema > 2) {
+          return NextResponse.json(
+            { ok: false, message: `不支持的备份格式：manifest schemaVersion=${schema}（仅支持 1–2）` },
+            { status: 400 },
+          );
+        }
+      } catch {
+        warnings.push("manifest.json 无法解析，将按 dish.json 继续尝试导入");
+      }
+    } else {
+      warnings.push("ZIP 中未包含 manifest.json（旧版备份），将按 dish.json 导入");
+    }
+
     const dishEntries = Object.values(zip.files).filter((f) => /(^|\/)dish\.json$/i.test(f.name));
     if (dishEntries.length === 0) {
       return NextResponse.json({ ok: false, message: "ZIP 中未找到 dish.json，无法恢复" }, { status: 400 });
@@ -197,7 +237,6 @@ export async function POST(req: NextRequest) {
 
     let imported = 0;
     let imageCount = 0;
-    const warnings: string[] = [];
     for (const entry of dishEntries) {
       if (entry.dir) continue;
       const dir = entry.name.split("/").slice(0, -1).join("/");
