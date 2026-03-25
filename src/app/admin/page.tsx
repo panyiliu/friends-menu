@@ -178,6 +178,21 @@ export default function AdminPage() {
 
   async function ensureAuthedOrRedirect() {
     const res = await fetch("/api/admin/session");
+    // #region agent log
+    fetch("http://127.0.0.1:7917/ingest/05fed06c-f8fa-4faf-9eb8-fc18d081b49e", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c4f207" },
+      body: JSON.stringify({
+        sessionId: "c4f207",
+        runId: "login-flow",
+        hypothesisId: "H5",
+        location: "admin/page.tsx:ensureAuthedOrRedirect",
+        message: "client_session_fetch",
+        data: { httpStatus: res.status },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     if (res.status === 401) {
       location.href = "/admin/login";
       return false;

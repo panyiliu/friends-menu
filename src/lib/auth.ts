@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 import { assertProdSecurityEnv } from "./env";
 
 const COOKIE_NAME = "admin_session";
@@ -10,17 +11,34 @@ function sign(value: string) {
   return createHmac("sha256", secret).update(value).digest("hex");
 }
 
-export async function setAdminSession(username: string) {
-  const payload = `${username}|${Date.now()}`;
-  const signature = sign(payload);
+function adminSessionCookieOptions() {
   const secureCookie = process.env.ADMIN_SESSION_SECURE === "true";
-  (await cookies()).set(COOKIE_NAME, `${payload}.${signature}`, {
-    httpOnly: true,
-    sameSite: "lax",
+  return {
+    httpOnly: true as const,
+    sameSite: "lax" as const,
     secure: secureCookie,
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
-  });
+  };
+}
+
+/** 构建会话 Cookie 值（与 verify 逻辑一致） */
+export function buildAdminSessionCookieValue(username: string) {
+  const payload = `${username}|${Date.now()}`;
+  const signature = sign(payload);
+  return `${payload}.${signature}`;
+}
+
+/**
+ * 在 Route Handler 中必须把 Cookie 写到同一 `NextResponse` 上，否则部分环境下
+ * `cookies().set()` 不会随 JSON 响应下发，导致登录成功但 `/api/admin/session` 仍 401。
+ */
+export function applyAdminSessionCookie(response: NextResponse, username: string) {
+  response.cookies.set(COOKIE_NAME, buildAdminSessionCookieValue(username), adminSessionCookieOptions());
+}
+
+export async function setAdminSession(username: string) {
+  (await cookies()).set(COOKIE_NAME, buildAdminSessionCookieValue(username), adminSessionCookieOptions());
 }
 
 export async function clearAdminSession() {

@@ -17,11 +17,28 @@ export default function AdminLoginPage() {
     });
     const text = await res.text();
     let data: { ok?: boolean; message?: string } = {};
+    let jsonParseOk = true;
     try {
       data = JSON.parse(text);
     } catch {
+      jsonParseOk = false;
       data = { ok: false, message: "登录接口返回异常，请查看服务端日志" };
     }
+    // #region agent log
+    fetch("http://127.0.0.1:7917/ingest/05fed06c-f8fa-4faf-9eb8-fc18d081b49e", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c4f207" },
+      body: JSON.stringify({
+        sessionId: "c4f207",
+        runId: "login-flow",
+        hypothesisId: "H1",
+        location: "admin/login/page.tsx:submit",
+        message: "login_fetch_result",
+        data: { httpStatus: res.status, ok: data.ok === true, bodyLen: text.length, jsonParseOk },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     if (data.ok) router.push("/admin");
     else setMessage(data.message || "登录失败");
   }

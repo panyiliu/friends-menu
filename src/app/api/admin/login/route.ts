@@ -1,9 +1,11 @@
-import { setAdminSession } from "@/lib/auth";
+import { applyAdminSessionCookie } from "@/lib/auth";
 import { logError, logWarn } from "@/lib/logger";
 import { getClientIp, takeRateLimit } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { appendFile } from "fs/promises";
 import { NextResponse } from "next/server";
+import path from "path";
 
 export async function POST(req: Request) {
   try {
@@ -32,8 +34,30 @@ export async function POST(req: Request) {
       }
     }
 
-    await setAdminSession(user.username);
-    return NextResponse.json({ ok: true });
+    const response = NextResponse.json({ ok: true });
+    applyAdminSessionCookie(response, user.username);
+    // #region agent log
+    const dbg = {
+      sessionId: "c4f207",
+      runId: "post-fix",
+      hypothesisId: "H3",
+      location: "api/admin/login/route.ts:POST",
+      message: "login_success_after_applyAdminSessionCookie",
+      data: {
+        secureFlag: process.env.ADMIN_SESSION_SECURE === "true",
+        nodeEnv: process.env.NODE_ENV || "",
+        setCookieOnResponse: true,
+      },
+      timestamp: Date.now(),
+    };
+    await fetch("http://127.0.0.1:7917/ingest/05fed06c-f8fa-4faf-9eb8-fc18d081b49e", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "c4f207" },
+      body: JSON.stringify(dbg),
+    }).catch(() => {});
+    await appendFile(path.join(process.cwd(), "debug-c4f207.log"), JSON.stringify(dbg) + "\n").catch(() => {});
+    // #endregion
+    return response;
   } catch (error) {
     const msg = error instanceof Error ? error.message : "后台登录失败";
     await logError("admin_login_failed", error);
