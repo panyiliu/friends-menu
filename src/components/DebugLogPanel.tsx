@@ -82,7 +82,14 @@ export function DebugLogPanel({ fetchServerLogs, enabled }: Props) {
           <button type="button" className="rounded bg-amber-900/80 px-2 py-0.5 text-amber-100" onClick={() => void refresh()}>
             刷新
           </button>
-          <button type="button" className="rounded bg-amber-900/80 px-2 py-0.5 text-amber-100" onClick={() => clearClientDebugLog()}>
+          <button
+            type="button"
+            className="rounded bg-amber-900/80 px-2 py-0.5 text-amber-100"
+            onClick={() => {
+              clearClientDebugLog();
+              setText("");
+            }}
+          >
             清空客户端
           </button>
           <button type="button" className="rounded bg-stone-800 px-2 py-0.5" onClick={() => setOpen((o) => !o)}>
