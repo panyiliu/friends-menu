@@ -138,7 +138,6 @@ export default function AdminPage() {
   const [expandedInviteId, setExpandedInviteId] = useState("");
   const [editingInviteTemplateId, setEditingInviteTemplateId] = useState("");
   const [inviteTemplateDrafts, setInviteTemplateDrafts] = useState<Record<string, WelcomeTemplate>>({});
-  const [isEmailConfigOpen, setIsEmailConfigOpen] = useState(false);
   const [recentSavedDishId, setRecentSavedDishId] = useState("");
   const [isOrderMultiSelect, setIsOrderMultiSelect] = useState(false);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
@@ -149,13 +148,12 @@ export default function AdminPage() {
   const [isDeletingDish, setIsDeletingDish] = useState(false);
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
   const [showPrimaryInviteCard, setShowPrimaryInviteCard] = useState(false);
-  const [showLowFrequencySettings, setShowLowFrequencySettings] = useState(false);
-  const [settingsSubTab, setSettingsSubTab] = useState<"links" | "categories" | "system" | "password">("links");
+  const [settingsSubTab, setSettingsSubTab] = useState<"links" | "categories" | "backup" | "email" | "system">("links");
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
   const [newAdminUsername, setNewAdminUsername] = useState("");
   const [newAdminPassword, setNewAdminPassword] = useState("");
-  const [resetAdminUsername, setResetAdminUsername] = useState("");
-  const [resetAdminNewPassword, setResetAdminNewPassword] = useState("");
+  /** 按用户名重置密码：新密码与确认 */
+  const [resetPwDrafts, setResetPwDrafts] = useState<Record<string, { newPw: string; confirm: string }>>({});
   const [authedChecked, setAuthedChecked] = useState(false);
   const [debugUi, setDebugUi] = useState(false);
 
@@ -170,6 +168,15 @@ export default function AdminPage() {
     }
     return set;
   }, [dishes]);
+
+  function inviteListDisplayName(inv: Invite) {
+    const g = (inv.inviteGuestName || "").trim();
+    const l = (inv.label || "").trim();
+    if (g && l) return `${g} · ${l}`;
+    if (g) return g;
+    if (l) return l;
+    return "未命名链接";
+  }
 
   const safeJson = async (res: Response) => {
     const text = await res.text();
@@ -570,6 +577,10 @@ export default function AdminPage() {
 
   async function createInvite() {
     if (isCreatingInvite) return;
+    if (!newInviteGuestName.trim()) {
+      setMessage("请输入朋友姓名");
+      return;
+    }
     setIsCreatingInvite(true);
     const expiresAt = inviteExpiresAt ? new Date(inviteExpiresAt).toISOString() : null;
     const res = await fetch("/api/admin/invite", {
@@ -681,6 +692,11 @@ export default function AdminPage() {
   async function changePassword(formData: FormData) {
     const oldPassword = String(formData.get("oldPassword") || "");
     const newPassword = String(formData.get("newPassword") || "");
+    const newPasswordConfirm = String(formData.get("newPasswordConfirm") || "");
+    if (newPassword !== newPasswordConfirm) {
+      setMessage("两次输入的新密码不一致");
+      return;
+    }
     const d = await fetch("/api/admin/password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -706,16 +722,26 @@ export default function AdminPage() {
     }
   }
 
-  async function resetTargetAdminPassword() {
+  async function resetAdminPasswordFor(username: string) {
+    const draft = resetPwDrafts[username] || { newPw: "", confirm: "" };
+    if (!draft.newPw.trim()) {
+      setMessage("请输入新密码");
+      return;
+    }
+    if (draft.newPw !== draft.confirm) {
+      setMessage("两次输入的新密码不一致");
+      return;
+    }
     const res = await fetch("/api/admin/users", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: resetAdminUsername, newPassword: resetAdminNewPassword }),
+      body: JSON.stringify({ username, newPassword: draft.newPw }),
     });
     const d = await safeJson(res);
     if (d.ok) {
       setMessage("管理员密码已重置");
-      setResetAdminNewPassword("");
+      setResetPwDrafts((prev) => ({ ...prev, [username]: { newPw: "", confirm: "" } }));
+      await refresh(false);
     } else {
       setMessage(d.message || "重置失败");
     }
@@ -1178,8 +1204,9 @@ export default function AdminPage() {
           <div className="flex flex-wrap gap-2 rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
             <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "links" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("links")}>链接管理</button>
             <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "categories" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("categories")}>菜品类型管理</button>
+            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "backup" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("backup")}>备份管理</button>
+            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "email" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("email")}>邮件设置</button>
             <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "system" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("system")}>系统设置</button>
-            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "password" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("password")}>修改后台密码</button>
           </div>
           <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "links" ? "" : "hidden"}`}>
             <h2 className="font-semibold">点餐链接管理</h2>
@@ -1188,22 +1215,20 @@ export default function AdminPage() {
             <div className="mt-3 space-y-4">
               <div className="rounded-xl border border-zinc-200 p-3">
                 <h3 className="font-semibold">新建链接与列表</h3>
+                <label className="mt-2 block text-xs font-medium text-zinc-600">朋友姓名</label>
                 <input
-                  className="mt-2 w-full rounded-xl border border-zinc-200 px-2 py-1 text-sm"
+                  className="mt-1 w-full rounded-xl border border-zinc-200 px-2 py-1 text-sm"
+                  placeholder="请输入朋友姓名（必填，用于欢迎词变量与下单姓名）"
+                  value={newInviteGuestName}
+                  onChange={(e) => setNewInviteGuestName(e.target.value)}
+                />
+                <label className="mt-2 block text-xs font-medium text-zinc-600">新链接名称</label>
+                <input
+                  className="mt-1 w-full rounded-xl border border-zinc-200 px-2 py-1 text-sm"
                   placeholder="新链接名称（例如：小王）"
                   value={newInviteLabel}
                   onChange={(e) => setNewInviteLabel(e.target.value)}
                 />
-                <input
-                  className="mt-2 w-full rounded-xl border border-zinc-200 px-2 py-1 text-sm"
-                  placeholder="朋友姓名（用于欢迎词变量与下单姓名）"
-                  value={newInviteGuestName}
-                  onChange={(e) => setNewInviteGuestName(e.target.value)}
-                />
-                <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
-                  <p>变量写法：<code>{"{{friendName}}"}</code></p>
-                  <p className="mt-1">预览：{`欢迎你，${newInviteGuestName || "朋友"}，开始点餐`}</p>
-                </div>
                 <label className="mt-2 flex items-center gap-2 text-sm text-zinc-700">
                   <input type="checkbox" checked={newInviteShowPrice} onChange={(e) => setNewInviteShowPrice(e.target.checked)} />
                   该链接对外展示价格
@@ -1278,11 +1303,10 @@ export default function AdminPage() {
                     const isMain = invite?.id === x.id;
                     return (
                       <div key={x.id} className="rounded-lg border border-zinc-200 p-2 text-xs">
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="font-medium">
-                            {x.label || "未命名链接"} {isMain ? "（主）" : ""}
+                            {inviteListDisplayName(x)} {isMain ? "（主）" : ""}
                           </p>
-                          {x.inviteGuestName ? <span className="text-zinc-500">朋友：{x.inviteGuestName}</span> : null}
                           <span className="text-zinc-500">
                             {x.isActive ? "启用" : "停用"} / {x.isExpired ? "过期" : "有效"}
                           </span>
@@ -1381,14 +1405,14 @@ export default function AdminPage() {
               </div>
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <h3 className="font-semibold">主链接（低频）</h3>
+                  <h3 className="font-semibold">主链接</h3>
                   <button type="button" className="rounded border px-2 py-0.5 text-xs" onClick={() => setShowPrimaryInviteCard((v) => !v)}>
                     {showPrimaryInviteCard ? "隐藏" : "显示"}
                   </button>
                 </div>
                 {showPrimaryInviteCard ? (
                   <>
-                <p className="mt-2 text-sm font-medium">{invite?.label || "未命名主链接"}</p>
+                <p className="mt-2 text-sm font-medium">{invite ? inviteListDisplayName(invite) : "—"}</p>
                 <p className="mt-1 text-xs text-gray-600">
                   {invite?.expiresAt
                     ? new Date(invite.expiresAt) < new Date()
@@ -1443,6 +1467,180 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
+          <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "categories" ? "" : "hidden"}`}>
+            <h2 className="font-semibold">菜品类型管理</h2>
+            <p className="mt-1 text-xs text-zinc-500">支持新增、删除、拖拽排序，排序结果会同步到用户点餐端。</p>
+            <div className="mt-2 flex gap-2">
+              <input
+                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
+                placeholder="新增分类名称（例如：热菜）"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+              />
+              <button className="rounded-xl bg-zinc-900 px-3 py-2 text-sm text-white" onClick={() => void createCategoryInSettings()}>
+                新增
+              </button>
+            </div>
+            <div className="mt-3 space-y-2">
+              {categories.map((c) => (
+                <div
+                  key={c.id}
+                  className="flex items-center justify-between rounded-xl border border-zinc-200 p-2"
+                  draggable
+                  onDragStart={() => setDraggingCategoryId(c.id)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => void reorderCategories(draggingCategoryId, c.id)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="cursor-move text-xs text-zinc-500">拖拽</span>
+                    <span className="text-sm font-medium">{c.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="rounded-lg border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50"
+                      onClick={() =>
+                        void fetch("/api/admin/categories", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ id: c.id, name: c.name, sortOrder: c.sortOrder, isEnabled: !c.isEnabled }),
+                        }).then(() => refresh(false))
+                      }
+                    >
+                      {c.isEnabled ? "停用" : "启用"}
+                    </button>
+                    <button className="rounded-lg border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50" onClick={() => void deleteCategoryInSettings(c.id)}>
+                      删除
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "backup" ? "" : "hidden"}`}>
+            <h2 className="font-semibold">备份管理</h2>
+            <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-3">
+              <h3 className="text-sm font-semibold">菜单数据备份/恢复（ZIP）</h3>
+              <p className="mt-1 text-xs text-zinc-500">导出格式：每道菜一个文件夹，内含 `dish.json` 和图片文件；可直接用于一键恢复。</p>
+              <input
+                ref={restoreZipInputRef}
+                type="file"
+                accept=".zip,application/zip"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) void importMenuBackupZip(file);
+                  e.currentTarget.value = "";
+                }}
+              />
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={() => void exportMenuBackupZip()}>
+                  一键备份 ZIP
+                </button>
+                <button
+                  className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50"
+                  onClick={() => {
+                    const input = document.createElement("input");
+                    input.type = "file";
+                    input.accept = ".zip,application/zip";
+                    input.onchange = () => {
+                      const file = input.files?.[0];
+                      if (file) void previewMenuBackupZip(file);
+                    };
+                    input.click();
+                  }}
+                >
+                  预检恢复 ZIP
+                </button>
+                <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={() => restoreZipInputRef.current?.click()}>
+                  一键恢复 ZIP
+                </button>
+              </div>
+            </div>
+            <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+              <h3 className="text-sm font-semibold">标签治理（高级）</h3>
+              <p className="mt-1 text-xs text-gray-500">自动隐藏无效标签已做在前台；这里提供“一键清理”，让管理员列表更干净。</p>
+              <button
+                className="mt-2 w-full rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+                onClick={() => void cleanupUnusedTags()}
+              >
+                一键清理无效标签
+              </button>
+            </div>
+            <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-3">
+              <h3 className="text-sm font-semibold text-red-700">危险操作：一键硬删除所有菜品</h3>
+              <p className="mt-1 text-xs text-red-600">会删除全部菜品、菜品图片，以及订单中的菜品明细（OrderItem），不可撤销。</p>
+              <button
+                className="mt-2 w-full rounded-xl border border-red-500 bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+                onClick={() => void purgeAllDishes()}
+              >
+                一键硬删除所有菜品
+              </button>
+            </div>
+          </div>
+          <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "email" ? "" : "hidden"}`}>
+            <h2 className="font-semibold">邮件设置</h2>
+            <p className="mt-1 text-xs text-zinc-500">以下配置保存后由服务器使用；发件需使用邮箱 SMTP 授权码。</p>
+            <label className="mt-3 flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={settings.emailEnabled}
+                onChange={(e) => {
+                  setSettings({ ...settings, emailEnabled: e.target.checked });
+                  setIsEditingSettings(true);
+                }}
+              />
+              启用邮件提醒
+            </label>
+            <label className="mt-3 block text-sm">发件邮箱（sender）</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
+              placeholder="发件邮箱（sender）"
+              value={settings.emailSender || ""}
+              onFocus={() => setIsEditingSettings(true)}
+              onChange={(e) => setSettings({ ...settings, emailSender: e.target.value })}
+            />
+            <label className="mt-2 block text-sm">授权码（password）</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
+              placeholder="授权码（password）"
+              value={settings.emailPassword || ""}
+              onFocus={() => setIsEditingSettings(true)}
+              onChange={(e) => setSettings({ ...settings, emailPassword: e.target.value })}
+            />
+            <label className="mt-2 block text-sm">收件邮箱（receiver）</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
+              placeholder="收件邮箱（receiver）"
+              value={settings.emailReceiver || ""}
+              onFocus={() => setIsEditingSettings(true)}
+              onChange={(e) => setSettings({ ...settings, emailReceiver: e.target.value })}
+            />
+            <label className="mt-2 block text-sm">SMTP server</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
+              placeholder="SMTP server"
+              value={settings.smtpServer || ""}
+              onFocus={() => setIsEditingSettings(true)}
+              onChange={(e) => setSettings({ ...settings, smtpServer: e.target.value })}
+            />
+            <label className="mt-2 block text-sm">SMTP port</label>
+            <input
+              className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
+              type="number"
+              placeholder="SMTP port"
+              value={settings.smtpPort || 587}
+              onFocus={() => setIsEditingSettings(true)}
+              onChange={(e) => setSettings({ ...settings, smtpPort: Number(e.target.value || 587) })}
+            />
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button className="rounded-xl bg-black px-3 py-2 text-sm text-white" onClick={saveSettings}>
+                保存邮件设置
+              </button>
+              <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={sendTestMail}>
+                发送测试邮件
+              </button>
+            </div>
+          </div>
           <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "system" ? "" : "hidden"}`}>
             <h2 className="font-semibold">系统设置</h2>
             <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm">
@@ -1459,11 +1657,7 @@ export default function AdminPage() {
               />
               <span>显示调试日志面板（全站生效，记录客户端请求；后台页额外展示服务端近期日志）。</span>
             </label>
-            <button type="button" className="mt-2 flex w-full items-center justify-between rounded-xl border border-zinc-200 px-3 py-2 text-left text-sm hover:bg-zinc-50" onClick={() => setShowLowFrequencySettings((v) => !v)}>
-              <span className="font-medium">低频区（邮件）</span>
-              <span className="text-xs text-zinc-500">{showLowFrequencySettings ? "收起" : "展开"}</span>
-            </button>
-            <label className="mt-2 block text-sm">系统名称</label>
+            <label className="mt-3 block text-sm">系统名称</label>
             <input
               className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2"
               value={settings.adminTitle || ""}
@@ -1480,10 +1674,6 @@ export default function AdminPage() {
               onFocus={() => setIsEditingSettings(true)}
               onChange={(e) => setSettings({ ...settings, refreshIntervalSec: Number(e.target.value || 8) })}
             />
-            <label className="mt-3 flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={settings.emailEnabled} onChange={(e) => setSettings({ ...settings, emailEnabled: e.target.checked })} />
-              启用邮件提醒
-            </label>
             <label className="mt-3 flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -1563,209 +1753,77 @@ export default function AdminPage() {
                 </div>
               </div>
             ) : null}
-            <div className={`mt-2 ${showLowFrequencySettings ? "" : "hidden"}`}>
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-left text-sm hover:bg-zinc-50"
-                onClick={() => setIsEmailConfigOpen((v) => !v)}
-              >
-                <span className="font-medium">邮件提醒配置</span>
-                <span className="text-xs text-zinc-500">{isEmailConfigOpen ? "收起" : "展开"}</span>
-              </button>
-              {isEmailConfigOpen ? (
-                <div className="mt-2 space-y-2">
-                  <input
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
-                    placeholder="发件邮箱（sender）"
-                    value={settings.emailSender || ""}
-                    onFocus={() => setIsEditingSettings(true)}
-                    onChange={(e) => setSettings({ ...settings, emailSender: e.target.value })}
-                  />
-                  <input
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
-                    placeholder="授权码（password）"
-                    value={settings.emailPassword || ""}
-                    onFocus={() => setIsEditingSettings(true)}
-                    onChange={(e) => setSettings({ ...settings, emailPassword: e.target.value })}
-                  />
-                  <input
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
-                    placeholder="收件邮箱（receiver）"
-                    value={settings.emailReceiver || ""}
-                    onFocus={() => setIsEditingSettings(true)}
-                    onChange={(e) => setSettings({ ...settings, emailReceiver: e.target.value })}
-                  />
-                  <input
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
-                    placeholder="SMTP server"
-                    value={settings.smtpServer || ""}
-                    onFocus={() => setIsEditingSettings(true)}
-                    onChange={(e) => setSettings({ ...settings, smtpServer: e.target.value })}
-                  />
-                  <input
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
-                    type="number"
-                    placeholder="SMTP port"
-                    value={settings.smtpPort || 587}
-                    onFocus={() => setIsEditingSettings(true)}
-                    onChange={(e) => setSettings({ ...settings, smtpPort: Number(e.target.value || 587) })}
-                  />
-                </div>
-              ) : null}
-            </div>
-            <div className="mt-2 flex gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
               <button className="rounded-xl bg-black px-3 py-2 text-sm text-white" onClick={saveSettings}>
                 保存系统设置
               </button>
-              <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={sendTestMail}>
-                发送测试邮件
-              </button>
             </div>
 
-            <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-3">
-              <h3 className="text-sm font-semibold">菜单数据备份/恢复（ZIP）</h3>
-              <p className="mt-1 text-xs text-zinc-500">导出格式：每道菜一个文件夹，内含 `dish.json` 和图片文件；可直接用于一键恢复。</p>
-              <input
-                ref={restoreZipInputRef}
-                type="file"
-                accept=".zip,application/zip"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void importMenuBackupZip(file);
-                  e.currentTarget.value = "";
-                }}
-              />
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={() => void exportMenuBackupZip()}>
-                  一键备份 ZIP
+            <div className="mt-8 border-t border-zinc-200 pt-6">
+              <h3 className="font-semibold">修改后台密码</h3>
+              <form className="mt-2 space-y-2" action={changePassword}>
+                <input className="w-full rounded-xl border border-zinc-200 px-3 py-2" name="oldPassword" type="password" placeholder="旧密码" autoComplete="current-password" />
+                <input className="w-full rounded-xl border border-zinc-200 px-3 py-2" name="newPassword" type="password" placeholder="新密码" autoComplete="new-password" />
+                <input className="w-full rounded-xl border border-zinc-200 px-3 py-2" name="newPasswordConfirm" type="password" placeholder="确认新密码" autoComplete="new-password" />
+                <button className="rounded-xl bg-black px-3 py-2 text-sm text-white" type="submit">
+                  保存新密码
                 </button>
-                <button
-                  className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50"
-                  onClick={() => {
-                    const input = document.createElement("input");
-                    input.type = "file";
-                    input.accept = ".zip,application/zip";
-                    input.onchange = () => {
-                      const file = input.files?.[0];
-                      if (file) void previewMenuBackupZip(file);
-                    };
-                    input.click();
-                  }}
-                >
-                  预检恢复 ZIP
-                </button>
-                <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={() => restoreZipInputRef.current?.click()}>
-                  一键恢复 ZIP
-                </button>
+              </form>
+            </div>
+
+            <div className="mt-8 border-t border-zinc-200 pt-6">
+              <h3 className="font-semibold">管理员设置</h3>
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                <input className="rounded-xl border border-zinc-200 px-3 py-2 text-sm" placeholder="新管理员用户名（3-24位）" value={newAdminUsername} onChange={(e) => setNewAdminUsername(e.target.value)} />
+                <input className="rounded-xl border border-zinc-200 px-3 py-2 text-sm" type="password" placeholder="新管理员密码（至少8位）" value={newAdminPassword} onChange={(e) => setNewAdminPassword(e.target.value)} />
               </div>
-            </div>
-
-            <div className="mt-4 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-              <h3 className="text-sm font-semibold">标签治理（高级）</h3>
-              <p className="mt-1 text-xs text-gray-500">自动隐藏无效标签已做在前台；这里提供“一键清理”，让管理员列表更干净。</p>
-              <button
-                className="mt-2 w-full rounded-xl bg-zinc-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
-                onClick={() => void cleanupUnusedTags()}
-              >
-                一键清理无效标签
+              <button className="mt-2 rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={() => void createAdminUser()}>
+                新增管理员
               </button>
-            </div>
-            <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-3">
-              <h3 className="text-sm font-semibold text-red-700">危险操作：一键硬删除所有菜品</h3>
-              <p className="mt-1 text-xs text-red-600">会删除全部菜品、菜品图片，以及订单中的菜品明细（OrderItem），不可撤销。</p>
-              <button
-                className="mt-2 w-full rounded-xl border border-red-500 bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
-                onClick={() => void purgeAllDishes()}
-              >
-                一键硬删除所有菜品
-              </button>
-            </div>
-          </div>
-          <form className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "password" ? "" : "hidden"}`} action={changePassword}>
-            <h2 className="font-semibold">修改后台密码</h2>
-            <input className="mt-2 w-full rounded-xl border border-zinc-200 px-3 py-2" name="oldPassword" type="password" placeholder="旧密码" />
-            <input className="mt-2 w-full rounded-xl border border-zinc-200 px-3 py-2" name="newPassword" type="password" placeholder="新密码" />
-            <button className="mt-2 rounded-xl bg-black px-3 py-2 text-sm text-white">保存新密码</button>
-          </form>
-          <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "password" ? "" : "hidden"}`}>
-            <h3 className="font-semibold">管理员管理</h3>
-            <div className="mt-2 grid gap-2 md:grid-cols-2">
-              <input className="rounded-xl border border-zinc-200 px-3 py-2 text-sm" placeholder="新管理员用户名（3-24位）" value={newAdminUsername} onChange={(e) => setNewAdminUsername(e.target.value)} />
-              <input className="rounded-xl border border-zinc-200 px-3 py-2 text-sm" type="password" placeholder="新管理员密码（至少8位）" value={newAdminPassword} onChange={(e) => setNewAdminPassword(e.target.value)} />
-            </div>
-            <button className="mt-2 rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={() => void createAdminUser()}>
-              新增管理员
-            </button>
-            <div className="mt-4 grid gap-2 md:grid-cols-2">
-              <select className="rounded-xl border border-zinc-200 px-3 py-2 text-sm" value={resetAdminUsername} onChange={(e) => setResetAdminUsername(e.target.value)}>
-                <option value="">选择要重置密码的管理员</option>
-                {adminUsers.map((u) => (
-                  <option key={u.id} value={u.username}>
-                    {u.username}
-                  </option>
-                ))}
-              </select>
-              <input className="rounded-xl border border-zinc-200 px-3 py-2 text-sm" type="password" placeholder="新密码（至少8位）" value={resetAdminNewPassword} onChange={(e) => setResetAdminNewPassword(e.target.value)} />
-            </div>
-            <button className="mt-2 rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50" onClick={() => void resetTargetAdminPassword()}>
-              重置指定管理员密码
-            </button>
-            <div className="mt-3 max-h-40 overflow-auto rounded-xl border border-zinc-200 p-2 text-xs text-zinc-600">
-              {adminUsers.map((u) => (
-                <p key={u.id}>
-                  {u.username}（创建于 {new Date(u.createdAt).toLocaleString()}）
-                </p>
-              ))}
-            </div>
-          </div>
-          <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "categories" ? "" : "hidden"}`}>
-            <h2 className="font-semibold">菜品类型管理</h2>
-            <p className="mt-1 text-xs text-zinc-500">支持新增、删除、拖拽排序，排序结果会同步到用户点餐端。</p>
-            <div className="mt-2 flex gap-2">
-              <input
-                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
-                placeholder="新增分类名称（例如：热菜）"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-              />
-              <button className="rounded-xl bg-zinc-900 px-3 py-2 text-sm text-white" onClick={() => void createCategoryInSettings()}>
-                新增
-              </button>
-            </div>
-            <div className="mt-3 space-y-2">
-              {categories.map((c) => (
-                <div
-                  key={c.id}
-                  className="flex items-center justify-between rounded-xl border border-zinc-200 p-2"
-                  draggable
-                  onDragStart={() => setDraggingCategoryId(c.id)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => void reorderCategories(draggingCategoryId, c.id)}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="cursor-move text-xs text-zinc-500">拖拽</span>
-                    <span className="text-sm font-medium">{c.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="rounded-lg border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50"
-                      onClick={() =>
-                        void fetch("/api/admin/categories", {
-                          method: "PUT",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ id: c.id, name: c.name, sortOrder: c.sortOrder, isEnabled: !c.isEnabled }),
-                        }).then(() => refresh(false))
-                      }
-                    >
-                      {c.isEnabled ? "停用" : "启用"}
-                    </button>
-                    <button className="rounded-lg border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50" onClick={() => void deleteCategoryInSettings(c.id)}>
-                      删除
-                    </button>
-                  </div>
-                </div>
-              ))}
+              <div className="mt-4 space-y-3">
+                {adminUsers.map((u) => {
+                  const draft = resetPwDrafts[u.username] || { newPw: "", confirm: "" };
+                  return (
+                    <div key={u.id} className="rounded-xl border border-zinc-200 bg-zinc-50/50 p-3">
+                      <p className="text-sm font-medium text-zinc-900">{u.username}</p>
+                      <p className="text-xs text-zinc-500">创建于 {new Date(u.createdAt).toLocaleString()}</p>
+                      <div className="mt-2 grid gap-2 md:grid-cols-2">
+                        <input
+                          className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm"
+                          type="password"
+                          placeholder="新密码"
+                          value={draft.newPw}
+                          onChange={(e) =>
+                            setResetPwDrafts((prev) => ({
+                              ...prev,
+                              [u.username]: { ...(prev[u.username] || { newPw: "", confirm: "" }), newPw: e.target.value },
+                            }))
+                          }
+                        />
+                        <input
+                          className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm"
+                          type="password"
+                          placeholder="确认新密码"
+                          value={draft.confirm}
+                          onChange={(e) =>
+                            setResetPwDrafts((prev) => ({
+                              ...prev,
+                              [u.username]: { ...(prev[u.username] || { newPw: "", confirm: "" }), confirm: e.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="mt-2 rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-100"
+                        onClick={() => void resetAdminPasswordFor(u.username)}
+                      >
+                        重置该管理员密码
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </section>
