@@ -1,4 +1,5 @@
 import { ensureAdmin } from "@/lib/api-auth";
+import { logError, logWarn } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { customAlphabet } from "nanoid";
 import { NextRequest, NextResponse } from "next/server";
@@ -24,128 +25,155 @@ function normalizeWelcomeTemplate(input: Record<string, unknown>) {
   };
 }
 
+function prismaSchemaHint(error: unknown) {
+  const text = error instanceof Error ? error.message : String(error || "");
+  if (
+    text.includes("Unknown arg") ||
+    text.includes("Unknown argument") ||
+    text.includes("column") ||
+    text.includes("does not exist") ||
+    text.includes("P2022")
+  ) {
+    return "数据库结构与当前代码不一致，请在服务器执行：docker compose exec app npx prisma migrate deploy";
+  }
+  return "";
+}
+
 export async function GET(req: NextRequest) {
   if (!ensureAdmin(req)) return NextResponse.json({ ok: false }, { status: 401 });
-  const setting = await prisma.systemSetting.findFirst();
-  const active = setting?.activeInviteId
-    ? await prisma.inviteLink.findUnique({ where: { id: setting.activeInviteId } })
-    : null;
-  const links = await prisma.inviteLink.findMany({ orderBy: { createdAt: "desc" } });
-  const now = new Date();
-  return NextResponse.json({
-    ok: true,
-    active,
-    links: links.map((x) => ({
-      ...x,
-      isExpired: Boolean(x.expiresAt && x.expiresAt < now),
-    })),
-  });
+  try {
+    const setting = await prisma.systemSetting.findFirst();
+    const active = setting?.activeInviteId
+      ? await prisma.inviteLink.findUnique({ where: { id: setting.activeInviteId } })
+      : null;
+    const links = await prisma.inviteLink.findMany({ orderBy: { createdAt: "desc" } });
+    const now = new Date();
+    return NextResponse.json({
+      ok: true,
+      active,
+      links: links.map((x) => ({
+        ...x,
+        isExpired: Boolean(x.expiresAt && x.expiresAt < now),
+      })),
+    });
+  } catch (error) {
+    const hint = prismaSchemaHint(error);
+    await logError("admin_invite_get_failed", error);
+    return NextResponse.json({ ok: false, message: hint || "读取点餐链接失败，请查看服务端日志" }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
   if (!ensureAdmin(req)) return NextResponse.json({ ok: false }, { status: 401 });
-  const body = await req.json();
-  const mode = body.mode as "reset" | "update" | "create" | "setActive" | "delete";
+  try {
+    const body = await req.json();
+    const mode = body.mode as "reset" | "update" | "create" | "setActive" | "delete";
 
-  let setting = await prisma.systemSetting.findFirst();
-  if (!setting) {
-    setting = await prisma.systemSetting.create({ data: {} });
-  }
-
-  if (mode === "reset") {
-    const tpl = normalizeWelcomeTemplate(body || {});
-    if (setting.activeInviteId) {
-      await prisma.inviteLink.update({ where: { id: setting.activeInviteId }, data: { isActive: false } });
+    let setting = await prisma.systemSetting.findFirst();
+    if (!setting) {
+      setting = await prisma.systemSetting.create({ data: {} });
     }
-    const created = await prisma.inviteLink.create({
-      data: {
-        token: nanoid(),
-        isActive: true,
-        inviteGuestName: String(body.inviteGuestName || ""),
-        showPrice: Boolean(body.showPrice ?? false),
-        expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
-        welcomeEnabled: tpl.welcomeEnabled ?? true,
-        welcomeTitle: tpl.welcomeTitle ?? "欢迎光临",
-        welcomeSubtitle: tpl.welcomeSubtitle ?? "请开始点餐",
-        welcomeButtonText: tpl.welcomeButtonText ?? "开始点餐",
-        welcomeFontSize: tpl.welcomeFontSize,
-        welcomeFontWeight: tpl.welcomeFontWeight,
-        welcomeTextAlign: tpl.welcomeTextAlign,
-        welcomeButtonColor: tpl.welcomeButtonColor ?? "#111827",
-        welcomeBackdropOpacity: tpl.welcomeBackdropOpacity,
-      },
-    });
-    await prisma.systemSetting.update({ where: { id: setting.id }, data: { activeInviteId: created.id } });
-    return NextResponse.json({ ok: true, active: created });
-  }
 
-  if (mode === "create") {
-    const tpl = normalizeWelcomeTemplate(body || {});
-    const created = await prisma.inviteLink.create({
-      data: {
-        token: nanoid(),
-        label: String(body.label || ""),
-        inviteGuestName: String(body.inviteGuestName || ""),
-        isActive: Boolean(body.isActive ?? true),
-        showPrice: Boolean(body.showPrice ?? false),
-        expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
-        welcomeEnabled: tpl.welcomeEnabled ?? true,
-        welcomeTitle: tpl.welcomeTitle ?? "欢迎光临",
-        welcomeSubtitle: tpl.welcomeSubtitle ?? "请开始点餐",
-        welcomeButtonText: tpl.welcomeButtonText ?? "开始点餐",
-        welcomeFontSize: tpl.welcomeFontSize,
-        welcomeFontWeight: tpl.welcomeFontWeight,
-        welcomeTextAlign: tpl.welcomeTextAlign,
-        welcomeButtonColor: tpl.welcomeButtonColor ?? "#111827",
-        welcomeBackdropOpacity: tpl.welcomeBackdropOpacity,
-      },
-    });
-    if (body.setAsActive === true) {
+    if (mode === "reset") {
+      const tpl = normalizeWelcomeTemplate(body || {});
+      if (setting.activeInviteId) {
+        await prisma.inviteLink.update({ where: { id: setting.activeInviteId }, data: { isActive: false } });
+      }
+      const created = await prisma.inviteLink.create({
+        data: {
+          token: nanoid(),
+          isActive: true,
+          inviteGuestName: String(body.inviteGuestName || ""),
+          showPrice: Boolean(body.showPrice ?? false),
+          expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+          welcomeEnabled: tpl.welcomeEnabled ?? true,
+          welcomeTitle: tpl.welcomeTitle ?? "欢迎光临",
+          welcomeSubtitle: tpl.welcomeSubtitle ?? "请开始点餐",
+          welcomeButtonText: tpl.welcomeButtonText ?? "开始点餐",
+          welcomeFontSize: tpl.welcomeFontSize,
+          welcomeFontWeight: tpl.welcomeFontWeight,
+          welcomeTextAlign: tpl.welcomeTextAlign,
+          welcomeButtonColor: tpl.welcomeButtonColor ?? "#111827",
+          welcomeBackdropOpacity: tpl.welcomeBackdropOpacity,
+        },
+      });
       await prisma.systemSetting.update({ where: { id: setting.id }, data: { activeInviteId: created.id } });
+      return NextResponse.json({ ok: true, active: created });
     }
-    return NextResponse.json({ ok: true, created });
-  }
 
-  if (mode === "setActive") {
-    const id = String(body.id || "");
-    if (!id) return NextResponse.json({ ok: false, message: "缺少链接ID" }, { status: 400 });
-    const exists = await prisma.inviteLink.findUnique({ where: { id } });
-    if (!exists) return NextResponse.json({ ok: false, message: "链接不存在" }, { status: 404 });
-    await prisma.systemSetting.update({ where: { id: setting.id }, data: { activeInviteId: id } });
-    return NextResponse.json({ ok: true });
-  }
+    if (mode === "create") {
+      const tpl = normalizeWelcomeTemplate(body || {});
+      const created = await prisma.inviteLink.create({
+        data: {
+          token: nanoid(),
+          label: String(body.label || ""),
+          inviteGuestName: String(body.inviteGuestName || ""),
+          isActive: Boolean(body.isActive ?? true),
+          showPrice: Boolean(body.showPrice ?? false),
+          expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+          welcomeEnabled: tpl.welcomeEnabled ?? true,
+          welcomeTitle: tpl.welcomeTitle ?? "欢迎光临",
+          welcomeSubtitle: tpl.welcomeSubtitle ?? "请开始点餐",
+          welcomeButtonText: tpl.welcomeButtonText ?? "开始点餐",
+          welcomeFontSize: tpl.welcomeFontSize,
+          welcomeFontWeight: tpl.welcomeFontWeight,
+          welcomeTextAlign: tpl.welcomeTextAlign,
+          welcomeButtonColor: tpl.welcomeButtonColor ?? "#111827",
+          welcomeBackdropOpacity: tpl.welcomeBackdropOpacity,
+        },
+      });
+      if (body.setAsActive === true) {
+        await prisma.systemSetting.update({ where: { id: setting.id }, data: { activeInviteId: created.id } });
+      }
+      return NextResponse.json({ ok: true, created });
+    }
 
-  if (mode === "delete") {
-    const id = String(body.id || "");
-    if (!id) return NextResponse.json({ ok: false, message: "缺少链接ID" }, { status: 400 });
-    if (setting.activeInviteId === id) return NextResponse.json({ ok: false, message: "当前主链接不能删除" }, { status: 400 });
-    await prisma.inviteLink.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
-  }
+    if (mode === "setActive") {
+      const id = String(body.id || "");
+      if (!id) return NextResponse.json({ ok: false, message: "缺少链接ID" }, { status: 400 });
+      const exists = await prisma.inviteLink.findUnique({ where: { id } });
+      if (!exists) return NextResponse.json({ ok: false, message: "链接不存在" }, { status: 404 });
+      await prisma.systemSetting.update({ where: { id: setting.id }, data: { activeInviteId: id } });
+      return NextResponse.json({ ok: true });
+    }
 
-  if (setting.activeInviteId) {
-    const tpl = normalizeWelcomeTemplate(body || {});
-    const updated = await prisma.inviteLink.update({
-      where: { id: String(body.id || setting.activeInviteId) },
-      data: {
-        label: body.label !== undefined ? String(body.label || "") : undefined,
-        inviteGuestName: body.inviteGuestName !== undefined ? String(body.inviteGuestName || "") : undefined,
-        expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
-        isActive: body.isActive === undefined ? undefined : Boolean(body.isActive),
-        showPrice: body.showPrice === undefined ? undefined : Boolean(body.showPrice),
-        welcomeEnabled: tpl.welcomeEnabled,
-        welcomeTitle: tpl.welcomeTitle,
-        welcomeSubtitle: tpl.welcomeSubtitle,
-        welcomeButtonText: tpl.welcomeButtonText,
-        welcomeFontSize: body.welcomeFontSize === undefined ? undefined : tpl.welcomeFontSize,
-        welcomeFontWeight: body.welcomeFontWeight === undefined ? undefined : tpl.welcomeFontWeight,
-        welcomeTextAlign: body.welcomeTextAlign === undefined ? undefined : tpl.welcomeTextAlign,
-        welcomeButtonColor: tpl.welcomeButtonColor,
-        welcomeBackdropOpacity: body.welcomeBackdropOpacity === undefined ? undefined : tpl.welcomeBackdropOpacity,
-      },
-    });
-    return NextResponse.json({ ok: true, active: updated });
-  }
+    if (mode === "delete") {
+      const id = String(body.id || "");
+      if (!id) return NextResponse.json({ ok: false, message: "缺少链接ID" }, { status: 400 });
+      if (setting.activeInviteId === id) return NextResponse.json({ ok: false, message: "当前主链接不能删除" }, { status: 400 });
+      await prisma.inviteLink.delete({ where: { id } });
+      return NextResponse.json({ ok: true });
+    }
 
-  return NextResponse.json({ ok: false, message: "无可更新链接" }, { status: 400 });
+    if (setting.activeInviteId) {
+      const tpl = normalizeWelcomeTemplate(body || {});
+      const updated = await prisma.inviteLink.update({
+        where: { id: String(body.id || setting.activeInviteId) },
+        data: {
+          label: body.label !== undefined ? String(body.label || "") : undefined,
+          inviteGuestName: body.inviteGuestName !== undefined ? String(body.inviteGuestName || "") : undefined,
+          expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
+          isActive: body.isActive === undefined ? undefined : Boolean(body.isActive),
+          showPrice: body.showPrice === undefined ? undefined : Boolean(body.showPrice),
+          welcomeEnabled: tpl.welcomeEnabled,
+          welcomeTitle: tpl.welcomeTitle,
+          welcomeSubtitle: tpl.welcomeSubtitle,
+          welcomeButtonText: tpl.welcomeButtonText,
+          welcomeFontSize: body.welcomeFontSize === undefined ? undefined : tpl.welcomeFontSize,
+          welcomeFontWeight: body.welcomeFontWeight === undefined ? undefined : tpl.welcomeFontWeight,
+          welcomeTextAlign: body.welcomeTextAlign === undefined ? undefined : tpl.welcomeTextAlign,
+          welcomeButtonColor: tpl.welcomeButtonColor,
+          welcomeBackdropOpacity: body.welcomeBackdropOpacity === undefined ? undefined : tpl.welcomeBackdropOpacity,
+        },
+      });
+      return NextResponse.json({ ok: true, active: updated });
+    }
+
+    await logWarn("admin_invite_update_without_active", { mode });
+    return NextResponse.json({ ok: false, message: "无可更新链接" }, { status: 400 });
+  } catch (error) {
+    const hint = prismaSchemaHint(error);
+    await logError("admin_invite_post_failed", error);
+    return NextResponse.json({ ok: false, message: hint || "创建/更新链接失败，请查看服务端日志" }, { status: 500 });
+  }
 }

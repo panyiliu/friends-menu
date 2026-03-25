@@ -1,4 +1,5 @@
 import { ensureAdmin } from "@/lib/api-auth";
+import { logError } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -44,32 +45,42 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   if (!ensureAdmin(req)) return NextResponse.json({ ok: false }, { status: 401 });
-  const body = await req.json();
-  const id = String(body.id || "");
-  const status = String(body.status || "");
-  if (!id || !["PENDING", "PREPARING", "DONE"].includes(status)) {
-    return NextResponse.json({ ok: false, message: "参数错误" }, { status: 400 });
+  try {
+    const body = await req.json();
+    const id = String(body.id || "");
+    const status = String(body.status || "");
+    if (!id || !["PENDING", "PREPARING", "DONE"].includes(status)) {
+      return NextResponse.json({ ok: false, message: "参数错误" }, { status: 400 });
+    }
+    const data = await prisma.order.update({
+      where: { id },
+      data: { status: status as "PENDING" | "PREPARING" | "DONE" },
+    });
+    return NextResponse.json({ ok: true, data });
+  } catch (error) {
+    await logError("admin_orders_patch_failed", error);
+    return NextResponse.json({ ok: false, message: "订单状态更新失败" }, { status: 500 });
   }
-  const data = await prisma.order.update({
-    where: { id },
-    data: { status: status as "PENDING" | "PREPARING" | "DONE" },
-  });
-  return NextResponse.json({ ok: true, data });
 }
 
 export async function DELETE(req: NextRequest) {
   if (!ensureAdmin(req)) return NextResponse.json({ ok: false }, { status: 401 });
-  const body = await req.json();
-  const ids = Array.isArray(body.ids) ? body.ids.map((x: unknown) => String(x)).filter(Boolean) : [];
-  if (ids.length === 0) {
-    return NextResponse.json({ ok: false, message: "缺少待删除订单ID" }, { status: 400 });
+  try {
+    const body = await req.json();
+    const ids = Array.isArray(body.ids) ? body.ids.map((x: unknown) => String(x)).filter(Boolean) : [];
+    if (ids.length === 0) {
+      return NextResponse.json({ ok: false, message: "缺少待删除订单ID" }, { status: 400 });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.orderItem.deleteMany({ where: { orderId: { in: ids } } });
+      const deleted = await tx.order.deleteMany({ where: { id: { in: ids } } });
+      return deleted.count;
+    });
+
+    return NextResponse.json({ ok: true, deletedCount: result });
+  } catch (error) {
+    await logError("admin_orders_delete_failed", error);
+    return NextResponse.json({ ok: false, message: "订单删除失败" }, { status: 500 });
   }
-
-  const result = await prisma.$transaction(async (tx) => {
-    await tx.orderItem.deleteMany({ where: { orderId: { in: ids } } });
-    const deleted = await tx.order.deleteMany({ where: { id: { in: ids } } });
-    return deleted.count;
-  });
-
-  return NextResponse.json({ ok: true, deletedCount: result });
 }

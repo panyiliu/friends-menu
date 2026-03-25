@@ -47,12 +47,23 @@ export function DebugLogPanel({ fetchServerLogs, enabled }: Props) {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       const method = init?.method || "GET";
       appendClientDebugLine(`${method} ${url}`);
+      const t0 = Date.now();
       try {
         const res = await orig(input, init);
-        appendClientDebugLine(`→ ${res.status} ${url}`);
+        const ms = Date.now() - t0;
+        appendClientDebugLine(`→ ${res.status} ${res.statusText} (${ms}ms) ${url}`);
+        if (!res.ok) {
+          try {
+            const text = await res.clone().text();
+            appendClientDebugLine(`→ body ${text.slice(0, 260).replace(/\s+/g, " ")}`);
+          } catch {
+            // ignore
+          }
+        }
         return res;
       } catch (e) {
-        appendClientDebugLine(`→ error ${e instanceof Error ? e.message : String(e)} ${url}`);
+        const ms = Date.now() - t0;
+        appendClientDebugLine(`→ error (${ms}ms) ${e instanceof Error ? e.message : String(e)} ${url}`);
         throw e;
       }
     };

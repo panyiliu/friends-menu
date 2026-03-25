@@ -1,4 +1,5 @@
 import { ensureAdmin } from "@/lib/api-auth";
+import { logInfo, logWarn } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -46,6 +47,26 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ ok: true, clearedCount: result.count });
+  }
+
+  if (body.mode === "purge-all") {
+    const confirmText = String(body.confirmText || "");
+    if (confirmText !== "DELETE ALL DISHES") {
+      return NextResponse.json({ ok: false, message: "确认词不正确，操作已取消" }, { status: 400 });
+    }
+    await logWarn("admin_dishes_purge_all_requested", {});
+    const result = await prisma.$transaction(async (tx) => {
+      const imageDeleted = await tx.dishImage.deleteMany({});
+      const orderItemDeleted = await tx.orderItem.deleteMany({});
+      const dishDeleted = await tx.dish.deleteMany({});
+      return {
+        imageDeleted: imageDeleted.count,
+        orderItemDeleted: orderItemDeleted.count,
+        dishDeleted: dishDeleted.count,
+      };
+    });
+    await logInfo("admin_dishes_purge_all_completed", result);
+    return NextResponse.json({ ok: true, ...result });
   }
 
   try {

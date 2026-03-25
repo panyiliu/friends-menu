@@ -499,7 +499,8 @@ export default function AdminPage() {
     const res = await fetch("/api/admin/backup-menu", { method: "POST", body: fd });
     const d = await safeJson(res);
     if (d.ok) {
-      setMessage(`恢复完成：已处理 ${d.imported || 0} 道菜，导入 ${d.imageCount || 0} 张图片`);
+      const warnText = Array.isArray(d.warnings) && d.warnings.length > 0 ? `；警告 ${d.warnings.length} 条（示例：${String(d.warnings[0])}）` : "";
+      setMessage(`恢复完成：已处理 ${d.imported || 0} 道菜，导入 ${d.imageCount || 0} 张图片${warnText}`);
       await refresh(false);
     } else {
       setMessage(d.message || "恢复失败");
@@ -514,7 +515,8 @@ export default function AdminPage() {
     const res = await fetch("/api/admin/backup-menu", { method: "POST", body: fd });
     const d = await safeJson(res);
     if (d.ok) {
-      setMessage(`预检完成：将处理 ${d.imported || 0} 道菜，图片 ${d.imageCount || 0} 张，警告 ${Array.isArray(d.warnings) ? d.warnings.length : 0} 条`);
+      const warnText = Array.isArray(d.warnings) && d.warnings.length > 0 ? `，示例：${String(d.warnings[0])}` : "";
+      setMessage(`预检完成：将处理 ${d.imported || 0} 道菜，图片 ${d.imageCount || 0} 张，警告 ${Array.isArray(d.warnings) ? d.warnings.length : 0} 条${warnText}`);
     } else {
       setMessage(d.message || "预检失败");
     }
@@ -533,6 +535,28 @@ export default function AdminPage() {
       await refresh(false);
     } else {
       setMessage(d.message || "标签清理失败");
+    }
+  }
+
+  async function purgeAllDishes() {
+    const first = prompt("危险操作：将硬删除所有菜品、菜品图片、订单菜品明细（OrderItem）。请输入确认词：DELETE ALL DISHES");
+    if (!first) return;
+    if (first.trim() !== "DELETE ALL DISHES") {
+      setMessage("确认词错误，已取消。");
+      return;
+    }
+    if (!confirm("请再次确认：该操作不可撤销，确定继续吗？")) return;
+    const res = await fetch("/api/admin/dishes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "purge-all", confirmText: first.trim() }),
+    });
+    const d = await safeJson(res);
+    if (d.ok) {
+      setMessage(`已硬删除：菜品 ${d.dishDeleted || 0}，菜品图片 ${d.imageDeleted || 0}，订单明细 ${d.orderItemDeleted || 0}`);
+      await refresh(false);
+    } else {
+      setMessage(d.message || "硬删除失败");
     }
   }
 
@@ -920,7 +944,7 @@ export default function AdminPage() {
                             onClick={() => openDishEditor(d)}
                           >
                             <div className="relative h-32 bg-gradient-to-br from-amber-100/60 to-orange-100/60">
-                              <Image src={d.images?.[0]?.url || "/next.svg"} alt="dish" fill sizes="33vw" className="object-cover opacity-90" />
+                              {d.images?.[0]?.url ? <Image src={d.images[0].url} alt="dish" fill sizes="33vw" className="object-cover opacity-90" /> : null}
                               <div className="absolute right-2 top-2">
                                 <span
                                   className={`rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${
@@ -1434,7 +1458,7 @@ export default function AdminPage() {
                   setDebugUiEnabled(v);
                 }}
               />
-              <span>显示调试日志面板（记录客户端请求；登录后台后包含服务端近期日志）。开关保存在本浏览器。</span>
+              <span>显示调试日志面板（全站生效，记录客户端请求；后台页额外展示服务端近期日志）。开关保存在本浏览器，也可通过 URL 参数 `?debug=1` 快速开启。</span>
             </label>
             <button type="button" className="mt-2 flex w-full items-center justify-between rounded-xl border border-zinc-200 px-3 py-2 text-left text-sm hover:bg-zinc-50" onClick={() => setShowLowFrequencySettings((v) => !v)}>
               <span className="font-medium">低频区（邮件）</span>
@@ -1646,6 +1670,16 @@ export default function AdminPage() {
                 onClick={() => void cleanupUnusedTags()}
               >
                 一键清理无效标签
+              </button>
+            </div>
+            <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-3">
+              <h3 className="text-sm font-semibold text-red-700">危险操作：一键硬删除所有菜品</h3>
+              <p className="mt-1 text-xs text-red-600">会删除全部菜品、菜品图片，以及订单中的菜品明细（OrderItem），不可撤销。</p>
+              <button
+                className="mt-2 w-full rounded-xl border border-red-500 bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+                onClick={() => void purgeAllDishes()}
+              >
+                一键硬删除所有菜品
               </button>
             </div>
           </div>

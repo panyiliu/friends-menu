@@ -35,6 +35,10 @@ function toPosix(input: string) {
   return input.replace(/\\/g, "/");
 }
 
+function normalizeZipRelPath(input: string) {
+  return toPosix(String(input || "").trim().replace(/^\.?\//, "")).replace(/^\/+/, "");
+}
+
 function toLocalUploadPath(input: string) {
   const raw = String(input || "").trim();
   if (!raw) return "";
@@ -106,6 +110,27 @@ async function loadImageFromSource(raw: string, publicDir: string): Promise<Buff
       if (alt) buf = await fetchRemoteImage(alt);
     }
     return buf;
+  }
+  return null;
+}
+
+function findZipFileByPath(zip: JSZip, preferredPath: string, dir: string) {
+  const preferred = normalizeZipRelPath(preferredPath);
+  const full = normalizeZipRelPath(path.join(dir, preferred));
+  const candidates = [full, preferred].filter(Boolean);
+
+  for (const p of candidates) {
+    const exact = zip.file(p);
+    if (exact) return exact;
+    const lower = p.toLowerCase();
+    const ci = Object.values(zip.files).find((f) => !f.dir && f.name.toLowerCase() === lower);
+    if (ci) return ci;
+  }
+
+  const basename = path.basename(preferred).toLowerCase();
+  if (basename) {
+    const fallback = Object.values(zip.files).find((f) => !f.dir && path.basename(f.name).toLowerCase() === basename && f.name.includes("/images/"));
+    if (fallback) return fallback;
   }
   return null;
 }
@@ -237,6 +262,7 @@ export async function POST(req: NextRequest) {
 
     let imported = 0;
     let imageCount = 0;
+    const details: Array<{ dish: string; imageRelCount: number; imageSourceCount: number; restored: number; miss: number }> = [];
     for (const entry of dishEntries) {
       if (entry.dir) continue;
       const dir = entry.name.split("/").slice(0, -1).join("/");
@@ -294,12 +320,13 @@ export async function POST(req: NextRequest) {
         const imageRelPaths = Array.isArray(meta.images) ? meta.images : [];
         const imageSources = Array.isArray(meta.imageSources) ? meta.imageSources.map((x) => String(x || "").trim()).filter(Boolean) : [];
         const restoredUrls: string[] = [];
+        let missCount = 0;
         const sourcePublicDir = path.join(process.cwd(), "public");
-        for (const relPath of imageRelPaths) {
-          const zipPath = toPosix(path.join(dir, String(relPath || "")));
-          const fileInZip = zip.file(zipPath);
+        for (let idx = 0; idx < imageRelPaths.length; idx += 1) {
+          const relPath = imageRelPaths[idx];
+          const fileInZip = findZipFileByPath(zip, String(relPath || ""), dir);
           if (!fileInZip) {
-            const source = imageSources[restoredUrls.length] || String(relPath || "").trim();
+            const source = imageSources[idx] || String(relPath || "").trim();
             const fileBytes = await loadImageFromSource(source, sourcePublicDir);
             if (fileBytes) {
               const ext = extFromUrl(source);
@@ -309,15 +336,13 @@ export async function POST(req: NextRequest) {
               restoredUrls.push(`/api/uploads/${encodeURIComponent(filename)}`);
               imageCount += 1;
             } else {
-              const fallbackUrl = String(source || "").trim();
-              if (fallbackUrl.startsWith("/api/uploads/") || fallbackUrl.startsWith("/uploads/")) {
-                restoredUrls.push(fallbackUrl);
-              }
+              missCount += 1;
+              warnings.push(`图片未恢复: ${name}（路径 ${String(relPath || "")} 未命中，且来源 ${source || "(空)"} 不可拉取）`);
             }
             continue;
           }
           const fileBytes = await fileInZip.async("nodebuffer");
-          const ext = path.extname(zipPath) || ".jpg";
+          const ext = path.extname(fileInZip.name) || ".jpg";
           const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
           const target = path.join(publicUploadsDir, filename);
           await fs.writeFile(target, fileBytes, { flush: true });
@@ -328,7 +353,11 @@ export async function POST(req: NextRequest) {
         if (imageRelPaths.length === 0 && imageSources.length > 0) {
           for (const source of imageSources) {
             const fileBytes = await loadImageFromSource(source, sourcePublicDir);
-            if (!fileBytes) continue;
+            if (!fileBytes) {
+              missCount += 1;
+              warnings.push(`图片未恢复: ${name}（imageSources: ${source} 无法拉取）`);
+              continue;
+            }
             const ext = extFromUrl(source);
             const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
             const target = path.join(publicUploadsDir, filename);
@@ -347,15 +376,16 @@ export async function POST(req: NextRequest) {
               isCover: idx === 0,
             })),
           });
-        } else if (imageRelPaths.length > 0) {
-          warnings.push(`图片缺失: ${name}（ZIP 内未找到对应 images 文件）`);
+        } else if (imageRelPaths.length > 0 || imageSources.length > 0) {
+          warnings.push(`图片缺失: ${name}（未成功恢复到任何图片）`);
         }
+        details.push({ dish: name, imageRelCount: imageRelPaths.length, imageSourceCount: imageSources.length, restored: restoredUrls.length, miss: missCount });
       });
       imported += 1;
     }
 
-    await logInfo("backup_restore_completed", { imported, imageCount, dryRun, warnings: warnings.length });
-    return NextResponse.json({ ok: true, imported, imageCount, dryRun, warnings });
+    await logInfo("backup_restore_completed", { imported, imageCount, dryRun, warnings: warnings.length, details });
+    return NextResponse.json({ ok: true, imported, imageCount, dryRun, warnings, details });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "恢复失败";
     await logError("backup_restore_failed", error);

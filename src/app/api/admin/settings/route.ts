@@ -1,12 +1,26 @@
 import { ensureAdmin } from "@/lib/api-auth";
+import { logError } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
+function schemaHint(error: unknown) {
+  const msg = error instanceof Error ? error.message : String(error || "");
+  if (msg.includes("Unknown argument") || msg.includes("column") || msg.includes("does not exist") || msg.includes("P2022")) {
+    return "数据库结构与当前代码不一致，请在服务器执行：docker compose exec app npx prisma migrate deploy";
+  }
+  return "";
+}
+
 export async function GET(req: NextRequest) {
   if (!ensureAdmin(req)) return NextResponse.json({ ok: false }, { status: 401 });
-  let setting = await prisma.systemSetting.findFirst();
-  if (!setting) setting = await prisma.systemSetting.create({ data: {} });
-  return NextResponse.json({ ok: true, setting });
+  try {
+    let setting = await prisma.systemSetting.findFirst();
+    if (!setting) setting = await prisma.systemSetting.create({ data: {} });
+    return NextResponse.json({ ok: true, setting });
+  } catch (error) {
+    await logError("admin_settings_get_failed", error);
+    return NextResponse.json({ ok: false, message: schemaHint(error) || "系统设置读取失败" }, { status: 500 });
+  }
 }
 
 export async function PUT(req: NextRequest) {
@@ -57,6 +71,8 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ ok: true, setting: updated });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "系统设置保存失败";
-    return NextResponse.json({ ok: false, message: `系统设置保存失败：${msg}` }, { status: 400 });
+    await logError("admin_settings_put_failed", error);
+    const hint = schemaHint(error);
+    return NextResponse.json({ ok: false, message: hint || `系统设置保存失败：${msg}` }, { status: 400 });
   }
 }
