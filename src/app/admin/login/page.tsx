@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const MAX_LOG = 50;
 
@@ -11,6 +11,28 @@ export default function AdminLoginPage() {
   const [busy, setBusy] = useState(false);
   const [logOpen, setLogOpen] = useState(true);
   const [logLines, setLogLines] = useState<string[]>([]);
+  const [sessionRechecking, setSessionRechecking] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/session", { credentials: "include", cache: "no-store" });
+        if (cancelled) return;
+        if (res.ok) {
+          window.location.replace("/admin");
+          return;
+        }
+      } catch {
+        /* 忽略，留在登录页 */
+      } finally {
+        if (!cancelled) setSessionRechecking(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const log = useCallback((line: string) => {
     const ts = new Date().toLocaleTimeString();
@@ -73,6 +95,7 @@ export default function AdminLoginPage() {
   return (
     <main className="mx-auto mt-16 max-w-lg rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
       <h1 className="text-xl font-bold text-zinc-900">后台登录</h1>
+      {sessionRechecking ? <p className="mt-2 text-xs text-zinc-500">正在检测是否已登录…</p> : null}
       <input
         className="mt-4 w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900"
         autoComplete="username"

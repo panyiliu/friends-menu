@@ -4,6 +4,21 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 /**
+ * 与 API 层 `ensureAdmin` 一致的会话判断（含非生产环境下 Edge/Node 密钥不一致时的宽松策略）。
+ */
+async function isAdminSessionOk(req: NextRequest): Promise<boolean> {
+  const secret = process.env.ADMIN_SESSION_SECRET || "dev-secret";
+  const token = req.cookies.get("admin_session")?.value;
+  let sessionOk = await verifyAdminSessionToken(token, secret);
+
+  if (!sessionOk && process.env.NODE_ENV !== "production" && token && token.includes(".")) {
+    sessionOk = true;
+  }
+
+  return sessionOk;
+}
+
+/**
  * Next.js 16 使用 `src/proxy.ts` 作为网关（原 middleware 约定已迁移至此）。
  * 后台与会话 API：校验 `admin_session` 签名（与 `ensureAdmin` 一致）。
  * 未登录访问 `/api/admin/*` 返回 401 JSON，避免 302 到登录页导致 fetch 误判。
@@ -14,9 +29,14 @@ export async function proxy(req: NextRequest) {
   if (!pathname.startsWith("/admin") && !pathname.startsWith("/api/admin")) {
     return NextResponse.next();
   }
+
   if (pathname === "/admin/login") {
+    if (await isAdminSessionOk(req)) {
+      return NextResponse.redirect(new URL("/admin", req.url));
+    }
     return NextResponse.next();
   }
+
   if (pathname.startsWith("/api/admin/login")) {
     return NextResponse.next();
   }
@@ -29,16 +49,7 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  const secret = process.env.ADMIN_SESSION_SECRET || "dev-secret";
-  const token = req.cookies.get("admin_session")?.value;
-  let sessionOk = await verifyAdminSessionToken(token, secret);
-
-  // 开发/非生产：Edge Proxy 与 Node Route 对 .env 中 ADMIN_SESSION_SECRET 的注入可能不一致，
-  // Node 已签发的 Cookie 在 Edge 验签会失败，表现为「登录成功但立刻回到登录页且无报错」。
-  // 生产环境必须保持严格验签；具体校验仍由 API Route 的 ensureAdmin 执行。
-  if (!sessionOk && process.env.NODE_ENV !== "production" && token && token.includes(".")) {
-    sessionOk = true;
-  }
+  const sessionOk = await isAdminSessionOk(req);
 
   if (!sessionOk) {
     if (pathname.startsWith("/api/admin/")) {

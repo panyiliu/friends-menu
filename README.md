@@ -124,23 +124,43 @@ npm run start:prod
 
 ## Docker 部署
 
+### 数据与配置分别放在哪（改 .env / git pull 会不会坏数据）
+
+| 位置 | 内容 | `git pull` 后 |
+|------|------|----------------|
+| 宿主机目录 **`./prisma/`**（挂载到容器） | SQLite `dev.db`、迁移文件 | **不会**被 `git pull` 覆盖；只要不删该目录，重建容器数据仍在。 |
+| 宿主机目录 **`./public/uploads/`** | 菜品等上传图片 | 同上。 |
+| 仓库里的 **`docker-compose.yml`** | 服务定义；端口等用 **`HOST_PORT`** 等变量引用 | 建议**不要**在服务器上手工改 compose，避免与远程冲突；改端口只改 **`.env`**。 |
+| **`/.env`**（自己创建，Git 不跟踪） | `HOST_PORT`、`ADMIN_SESSION_SECRET`、`ADMIN_SESSION_SECURE` 等 | 拉代码**不会**覆盖你的 `.env`。 |
+
+**改环境变量会怎样（数据是否损坏）**
+
+- 只改 **`HOST_PORT`**：仅访问端口变化，**数据库与图片不变**。
+- 改 **`ADMIN_SESSION_SECRET`**：旧 Cookie 全部失效，需**重新登录**，**不损坏**库里的数据。
+- 改 **`ADMIN_SESSION_SECURE`**：若与当前访问协议（HTTP/HTTPS）不一致，可能表现为登不进，**不损坏**数据。
+
+**与 Git 协作**
+
+- 推荐：服务器上 **`cp .env.example .env`**，只编辑 `.env`；**不要**把密钥提交进仓库。
+- 若 `git pull` 提示会覆盖你改过的 `docker-compose.yml`，可用 `git stash` 暂存后拉取再合并，或放弃本地对 compose 的修改、改用 `.env` 满足需求。
+- **切勿**对宿主机上的 `prisma/dev.db` 或 `public/uploads/` 执行 `git restore` / 强制覆盖，以免清空运行数据。
+
+变量说明见仓库根目录 **[`.env.example`](.env.example)**。
+
 ### 全新服务器（已安装 Git、Docker、Docker Compose）
 
-在服务器上选目录（示例 `/opt/friends-menu`），克隆你推送后的仓库并启动：
+在服务器上选目录（示例 `/opt/friends-menu`），克隆并配置：
 
 ```bash
 cd /opt
 git clone https://github.com/<你的用户名>/<仓库名>.git friends-menu
 cd friends-menu
+cp .env.example .env
 ```
 
-**强烈建议**先设置密钥再启动（可直接写在命令前，或在本目录创建 `.env` 由 Compose 读取）：
+编辑 **`.env`**：至少设置 **`ADMIN_SESSION_SECRET`**（≥24 位随机串）；若用浏览器 **HTTP** 访问 `http://IP:端口`，将 **`ADMIN_SESSION_SECURE=false`**；需要改对外端口时改 **`HOST_PORT`**（默认 5223）。
 
 ```bash
-export ADMIN_SESSION_SECRET="请改为至少24位随机字符串"
-# 仅用浏览器访问 http://IP:5223（HTTP）时，必须设为 false，否则后台 Cookie 无法登录：
-export ADMIN_SESSION_SECURE=false
-# 若前面已用 HTTPS 反代访问，改为 true 并配合 Nginx 等终止 TLS
 docker compose up -d --build
 ```
 
@@ -156,9 +176,9 @@ docker compose exec app npx prisma migrate deploy
 docker compose exec app npm run prisma:seed
 ```
 
-浏览器访问 **`http://<服务器公网或内网IP>:5223`**，后台 **`/admin/login`**，默认账号见上文「默认账号」。
+浏览器访问 **`http://<服务器IP>:<HOST_PORT>`**（默认 5223），后台 **`/admin/login`**，默认账号见上文「默认账号」。
 
-升级新版本：在同一目录 `git pull` 后执行 `docker compose up -d --build`，再视需要执行 `npx prisma migrate deploy`。
+升级新版本：在同一目录 **`git pull`** 后执行 **`docker compose up -d --build`**，再视需要执行 **`npx prisma migrate deploy`**。数据仍在挂载目录中。
 
 ### 本地打包运行
 
@@ -166,7 +186,7 @@ docker compose exec app npm run prisma:seed
 docker compose up -d --build
 ```
 
-访问：`http://<服务器IP>:5223`
+访问：`http://<服务器IP>:<HOST_PORT>`（默认 5223，见 `.env` / `.env.example`）
 
 ### 说明
 

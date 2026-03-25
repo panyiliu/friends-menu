@@ -1,9 +1,9 @@
 services:
   app:
     build: .
-    container_name: friends-menu
+    container_name: ${CONTAINER_NAME:-friends-menu}
     ports:
-      - "5223:3000"
+      - "${HOST_PORT:-5223}:3000"
     environment:
       - DATABASE_URL=file:/app/prisma/dev.db
       - ADMIN_SESSION_SECURE=${ADMIN_SESSION_SECURE:-true}
