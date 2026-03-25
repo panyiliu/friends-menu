@@ -36,7 +36,12 @@ function toPosix(input: string) {
 }
 
 function normalizeZipRelPath(input: string) {
-  return toPosix(String(input || "").trim().replace(/^\.?\//, "")).replace(/^\/+/, "");
+  const raw = toPosix(String(input || "").trim().replace(/^\.?\//, "")).replace(/^\/+/, "");
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
 }
 
 function toLocalUploadPath(input: string) {
@@ -100,6 +105,19 @@ async function loadImageFromSource(raw: string, publicDir: string): Promise<Buff
       return await fs.readFile(fsPath);
     } catch {
       // continue to remote fetch fallback
+    }
+  }
+
+  // 兼容老备份里 imageSources 只存相对路径（/uploads/... 或 /api/uploads/...）的情况。
+  // 当本地文件不存在时，尝试拼接站点基址从当前/原站拉取。
+  if (src.startsWith("/uploads/") || src.startsWith("/api/uploads/")) {
+    const bases = [process.env.INTERNAL_BASE_URL, process.env.PUBLIC_SITE_URL]
+      .map((x) => String(x || "").trim().replace(/\/+$/, ""))
+      .filter(Boolean);
+    const normalizedPath = src.startsWith("/uploads/") ? `/api${src}` : src;
+    for (const base of bases) {
+      const buf = await fetchRemoteImage(`${base}${normalizedPath}`);
+      if (buf) return buf;
     }
   }
 
