@@ -129,7 +129,7 @@ function findZipFileByPath(zip: JSZip, preferredPath: string, dir: string) {
 
   const basename = path.basename(preferred).toLowerCase();
   if (basename) {
-    const fallback = Object.values(zip.files).find((f) => !f.dir && path.basename(f.name).toLowerCase() === basename && f.name.includes("/images/"));
+    const fallback = Object.values(zip.files).find((f) => !f.dir && path.basename(f.name).toLowerCase() === basename);
     if (fallback) return fallback;
   }
   return null;
@@ -327,6 +327,17 @@ export async function POST(req: NextRequest) {
           const fileInZip = findZipFileByPath(zip, String(relPath || ""), dir);
           if (!fileInZip) {
             const source = imageSources[idx] || String(relPath || "").trim();
+            const sourceAsZip = source ? findZipFileByPath(zip, source, dir) : null;
+            if (sourceAsZip) {
+              const fileBytes = await sourceAsZip.async("nodebuffer");
+              const ext = path.extname(sourceAsZip.name) || ".jpg";
+              const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
+              const target = path.join(publicUploadsDir, filename);
+              await fs.writeFile(target, fileBytes, { flush: true });
+              restoredUrls.push(`/api/uploads/${encodeURIComponent(filename)}`);
+              imageCount += 1;
+              continue;
+            }
             const fileBytes = await loadImageFromSource(source, sourcePublicDir);
             if (fileBytes) {
               const ext = extFromUrl(source);
