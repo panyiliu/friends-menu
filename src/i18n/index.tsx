@@ -3,6 +3,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { DEFAULT_LANG, type Lang, SUPPORTED_LANGS } from "./config";
 import { persistClientLang, resolveClientLang } from "./utils";
+import zhCommon from "@/locales/zh/common.json";
+import zhGuest from "@/locales/zh/guest.json";
+import zhAdmin from "@/locales/zh/admin.json";
+import zhErrors from "@/locales/zh/errors.json";
+import enCommon from "@/locales/en/common.json";
+import enGuest from "@/locales/en/guest.json";
+import enAdmin from "@/locales/en/admin.json";
+import enErrors from "@/locales/en/errors.json";
 
 type DictLeaf = string | number | boolean | null;
 export type DictValue = DictLeaf | DictValue[] | { [k: string]: DictValue };
@@ -15,33 +23,10 @@ type I18nContextValue = {
 };
 
 const I18nContext = createContext<I18nContextValue | null>(null);
-
-async function loadModule(lang: Lang, moduleName: string): Promise<Dict> {
-  // Keep it explicit so bundler can include JSON.
-  if (lang === "zh") {
-    if (moduleName === "common") return (await import("@/locales/zh/common.json")).default as Dict;
-    if (moduleName === "guest") return (await import("@/locales/zh/guest.json")).default as Dict;
-    if (moduleName === "admin") return (await import("@/locales/zh/admin.json")).default as Dict;
-    if (moduleName === "errors") return (await import("@/locales/zh/errors.json")).default as Dict;
-  }
-  if (lang === "en") {
-    if (moduleName === "common") return (await import("@/locales/en/common.json")).default as Dict;
-    if (moduleName === "guest") return (await import("@/locales/en/guest.json")).default as Dict;
-    if (moduleName === "admin") return (await import("@/locales/en/admin.json")).default as Dict;
-    if (moduleName === "errors") return (await import("@/locales/en/errors.json")).default as Dict;
-  }
-  return {};
-}
-
-async function loadAll(lang: Lang): Promise<Dict> {
-  const [common, guest, admin, errors] = await Promise.all([
-    loadModule(lang, "common"),
-    loadModule(lang, "guest"),
-    loadModule(lang, "admin"),
-    loadModule(lang, "errors"),
-  ]);
-  return { ...common, guest, admin, errors };
-}
+const dictionaries: Record<Lang, Dict> = {
+  zh: { ...(zhCommon as Dict), ...(zhGuest as Dict), ...(zhAdmin as Dict), ...(zhErrors as Dict) },
+  en: { ...(enCommon as Dict), ...(enGuest as Dict), ...(enAdmin as Dict), ...(enErrors as Dict) },
+};
 
 function getByPath(dict: Dict, key: string): unknown {
   const parts = String(key).split(".").filter(Boolean);
@@ -60,7 +45,7 @@ function formatTemplate(input: string, params?: Record<string, string | number>)
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<Lang>(DEFAULT_LANG);
-  const [dict, setDict] = useState<Dict>({});
+  const [dict, setDict] = useState<Dict>(dictionaries[DEFAULT_LANG]);
 
   useEffect(() => {
     const resolved = resolveClientLang();
@@ -68,14 +53,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const next = await loadAll(lang);
-      if (!cancelled) setDict(next);
-    })();
-    return () => {
-      cancelled = true;
-    };
+    setDict(dictionaries[lang] || dictionaries[DEFAULT_LANG]);
   }, [lang]);
 
   const setLang = useCallback((next: Lang) => {
