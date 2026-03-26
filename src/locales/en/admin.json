@@ -47,6 +47,41 @@
     },
     "links": {
       "unnamed": "Untitled link"
+    },
+    "settings": {
+      "tabs": {
+        "links": "Links",
+        "categories": "Categories",
+        "backup": "Backup",
+        "email": "Email",
+        "system": "System",
+        "users": "Users"
+      },
+      "linksTitle": "Order Link Management",
+      "categoriesTitle": "Category Management",
+      "backupTitle": "Backup Management",
+      "emailTitle": "Email Settings",
+      "systemTitle": "System Settings",
+      "usersTitle": "User Management",
+      "friendName": "Friend Name",
+      "newLinkName": "New Link Name",
+      "showPrice": "Show prices for this link",
+      "expiryTitle": "Link expiry (default 3 days, editable)",
+      "setPermanent": "Set Permanent",
+      "saveExpiry": "Save Expiry",
+      "copyLink": "Copy Link",
+      "createLink": "Create Link",
+      "creating": "Creating...",
+      "resetLink": "Reset Link",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "expired": "Expired",
+      "valid": "Valid",
+      "permanent": "Permanent",
+      "viewLink": "View Link",
+      "collapseLink": "Collapse Link",
+      "template": "Template",
+      "collapseTemplate": "Collapse Template"
     }
   }
 }

@@ -47,6 +47,41 @@
     },
     "links": {
       "unnamed": "未命名链接"
+    },
+    "settings": {
+      "tabs": {
+        "links": "链接管理",
+        "categories": "菜品类型管理",
+        "backup": "备份管理",
+        "email": "邮件设置",
+        "system": "系统设置",
+        "users": "用户管理"
+      },
+      "linksTitle": "点餐链接管理",
+      "categoriesTitle": "菜品类型管理",
+      "backupTitle": "备份管理",
+      "emailTitle": "邮件设置",
+      "systemTitle": "系统设置",
+      "usersTitle": "用户管理",
+      "friendName": "朋友姓名",
+      "newLinkName": "新链接名称",
+      "showPrice": "该链接对外展示价格",
+      "expiryTitle": "链接有效期（默认 3 天，可修改）",
+      "setPermanent": "设为永久",
+      "saveExpiry": "保存有效期",
+      "copyLink": "复制链接",
+      "createLink": "新建链接",
+      "creating": "创建中...",
+      "resetLink": "重置链接",
+      "enabled": "启用",
+      "disabled": "停用",
+      "expired": "过期",
+      "valid": "有效",
+      "permanent": "永久有效",
+      "viewLink": "查看链接",
+      "collapseLink": "收起链接",
+      "template": "模板",
+      "collapseTemplate": "收起模板"
     }
   }
 }

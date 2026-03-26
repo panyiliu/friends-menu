@@ -56,9 +56,14 @@ export default function GuestMenuClient({ token }: { token: string }) {
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
-    fetch(`/api/guest/menu/${token}`)
+    let cancelled = false;
+    const ac = new AbortController();
+    const timer = window.setTimeout(() => ac.abort(), 12000);
+
+    fetch(`/api/guest/menu/${token}`, { signal: ac.signal })
       .then((r) => r.json())
       .then((d) => {
+        if (cancelled) return;
         if (d.ok) {
           setCategories(d.categories || []);
           setShowPrice(Boolean(d.showPrice));
@@ -77,11 +82,29 @@ export default function GuestMenuClient({ token }: { token: string }) {
             setShowWelcome(Boolean(d.welcomeTemplate?.enabled));
           }
           setError("");
-        } else setError(d.message || t("guest.menu.linkInvalid"));
+        } else {
+          setError(d.message || t("guest.menu.linkInvalid"));
+        }
       })
-      .catch(() => setError(t("guest.menu.menuLoadFailed")))
-      .finally(() => setLoadingMenu(false));
-  }, [token]);
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        if (err instanceof DOMException && err.name === "AbortError") {
+          setError(t("guest.menu.menuLoadTimeout"));
+          return;
+        }
+        setError(t("guest.menu.menuLoadFailed"));
+      })
+      .finally(() => {
+        window.clearTimeout(timer);
+        if (!cancelled) setLoadingMenu(false);
+      });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      ac.abort();
+    };
+  }, [token, t]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

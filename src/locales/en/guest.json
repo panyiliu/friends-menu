@@ -16,6 +16,7 @@
       "linkUnavailableTip1": "Please contact the admin to share a new link.",
       "linkInvalid": "Invalid link",
       "menuLoadFailed": "Failed to load menu. Please try again.",
+      "menuLoadTimeout": "Menu loading timed out. Please refresh and try again.",
       "defaultGuestName": "Friend",
       "needAtLeastOne": "Please add at least one dish.",
       "add": "Add",

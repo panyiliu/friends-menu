@@ -1301,28 +1301,28 @@ export default function AdminPage() {
       {tab === "settings" ? (
         <section className="mt-4 space-y-4">
           <div className="flex flex-wrap gap-2 rounded-2xl border border-zinc-200 bg-white p-2 shadow-sm">
-            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "links" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("links")}>链接管理</button>
-            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "categories" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("categories")}>菜品类型管理</button>
-            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "backup" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("backup")}>备份管理</button>
-            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "email" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("email")}>邮件设置</button>
-            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "system" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("system")}>系统设置</button>
-            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "users" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("users")}>用户管理</button>
+            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "links" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("links")}>{t("admin.settings.tabs.links")}</button>
+            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "categories" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("categories")}>{t("admin.settings.tabs.categories")}</button>
+            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "backup" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("backup")}>{t("admin.settings.tabs.backup")}</button>
+            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "email" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("email")}>{t("admin.settings.tabs.email")}</button>
+            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "system" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("system")}>{t("admin.settings.tabs.system")}</button>
+            <button className={`rounded-xl px-3 py-2 text-sm ${settingsSubTab === "users" ? "bg-zinc-900 text-white" : "hover:bg-zinc-100"}`} onClick={() => setSettingsSubTab("users")}>{t("admin.settings.tabs.users")}</button>
           </div>
           <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "links" ? "" : "hidden"}`}>
-            <h2 className="font-semibold">点餐链接管理</h2>
+            <h2 className="font-semibold">{t("admin.settings.linksTitle")}</h2>
             <p className="mt-1 text-xs text-gray-500">模板支持变量：<code>{"{{friendName}}"}</code>，会自动替换为该链接的朋友姓名。</p>
 
             <div className="mt-3 space-y-4">
               <div className="rounded-xl border border-zinc-200 p-3">
                 <h3 className="font-semibold">新建链接与列表</h3>
-                <label className="mt-2 block text-xs font-medium text-zinc-600">朋友姓名</label>
+                <label className="mt-2 block text-xs font-medium text-zinc-600">{t("admin.settings.friendName")}</label>
                 <input
                   className="mt-1 w-full rounded-xl border border-zinc-200 px-2 py-1 text-sm"
                   placeholder="请输入朋友姓名（必填，用于欢迎词变量与下单姓名）"
                   value={newInviteGuestName}
                   onChange={(e) => setNewInviteGuestName(e.target.value)}
                 />
-                <label className="mt-2 block text-xs font-medium text-zinc-600">新链接名称</label>
+                <label className="mt-2 block text-xs font-medium text-zinc-600">{t("admin.settings.newLinkName")}</label>
                 <input
                   className="mt-1 w-full rounded-xl border border-zinc-200 px-2 py-1 text-sm"
                   placeholder="新链接名称（例如：小王）"
@@ -1331,10 +1331,10 @@ export default function AdminPage() {
                 />
                 <label className="mt-2 flex items-center gap-2 text-sm text-zinc-700">
                   <input type="checkbox" checked={newInviteShowPrice} onChange={(e) => setNewInviteShowPrice(e.target.checked)} />
-                  该链接对外展示价格
+                  {t("admin.settings.showPrice")}
                 </label>
                 <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-2">
-                  <p className="text-xs font-medium text-zinc-700">链接有效期（默认 3 天，可修改）</p>
+                  <p className="text-xs font-medium text-zinc-700">{t("admin.settings.expiryTitle")}</p>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <span className="text-xs text-zinc-500">快捷：</span>
                     <select
@@ -1368,7 +1368,7 @@ export default function AdminPage() {
                         setNewInviteExpiresAt("");
                       }}
                     >
-                      设为永久
+                      {t("admin.settings.setPermanent")}
                     </button>
                   </div>
                   <p className="mt-1 text-[11px] text-zinc-500">为空表示永久有效；到期后访客端会提示链接过期。</p>
@@ -1430,10 +1430,10 @@ export default function AdminPage() {
                 </details>
                 <div className="mt-2 flex gap-2">
                   <button className="rounded-xl border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-50 disabled:opacity-60" disabled={isCreatingInvite} onClick={createInvite}>
-                    {isCreatingInvite ? "创建中..." : "新建链接"}
+                    {isCreatingInvite ? t("admin.settings.creating") : t("admin.settings.createLink")}
                   </button>
                   <button className="rounded-xl bg-black px-3 py-2 text-sm text-white" onClick={resetInvite}>
-                    重置链接
+                    {t("admin.settings.resetLink")}
                   </button>
                 </div>
 
@@ -1446,15 +1446,15 @@ export default function AdminPage() {
                       <div key={x.id} className="rounded-lg border border-zinc-200 p-2 text-xs">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="font-medium">
-                            {inviteListDisplayName(x)} {isMain ? "（主）" : ""}
+                            {inviteListDisplayName(x)} {isMain ? "（Main）" : ""}
                           </p>
                           <span className="text-zinc-500">
-                            {x.isActive ? "启用" : "停用"} / {x.isExpired ? "过期" : "有效"}
+                            {x.isActive ? t("admin.settings.enabled") : t("admin.settings.disabled")} / {x.isExpired ? t("admin.settings.expired") : t("admin.settings.valid")}
                           </span>
                         </div>
                         <div className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2">
                           <p className="text-[11px] text-zinc-500">
-                            有效期：{x.expiresAt ? new Date(x.expiresAt).toLocaleString() : "永久有效"}
+                            {t("admin.settings.expiryTitle")}：{x.expiresAt ? new Date(x.expiresAt).toLocaleString() : t("admin.settings.permanent")}
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             <button
@@ -1491,13 +1491,13 @@ export default function AdminPage() {
                               className="rounded border px-2 py-0.5"
                               onClick={() => setInviteExpiryDrafts((prev) => ({ ...prev, [x.id]: "" }))}
                             >
-                              永久
+                              {t("admin.settings.permanent")}
                             </button>
                             <button
                               className="rounded border px-2 py-0.5"
                               onClick={() => void saveInviteExpiryFor(x.id, draft)}
                             >
-                              保存有效期
+                              {t("admin.settings.saveExpiry")}
                             </button>
                           </div>
                         </div>
@@ -1506,10 +1506,10 @@ export default function AdminPage() {
                             className="rounded border px-2 py-0.5"
                             onClick={async () => {
                               const ok = await copyText(link);
-                              setMessage(ok ? "链接已复制" : "复制失败，请手动复制");
+                              setMessage(ok ? t("admin.settings.copyLink") : "Copy failed, please copy manually.");
                             }}
                           >
-                            复制
+                            {t("admin.settings.copyLink")}
                           </button>
                           <button
                             className="rounded border px-2 py-0.5"
@@ -1548,7 +1548,7 @@ export default function AdminPage() {
                             </button>
                           ) : null}
                           <button className="rounded border px-2 py-0.5" onClick={() => setExpandedInviteId((v) => (v === x.id ? "" : x.id))}>
-                            {expandedInviteId === x.id ? "收起链接" : "查看链接"}
+                            {expandedInviteId === x.id ? t("admin.settings.collapseLink") : t("admin.settings.viewLink")}
                           </button>
                           <button
                             className="rounded border px-2 py-0.5"
@@ -1557,7 +1557,7 @@ export default function AdminPage() {
                               setInviteTemplateDrafts((prev) => ({ ...prev, [x.id]: prev[x.id] || toTemplate(x) }));
                             }}
                           >
-                            {editingInviteTemplateId === x.id ? "收起模板" : "模板"}
+                            {editingInviteTemplateId === x.id ? t("admin.settings.collapseTemplate") : t("admin.settings.template")}
                           </button>
                         </div>
                         {expandedInviteId === x.id ? <p className="mt-1 break-all text-zinc-500">{link}</p> : null}
@@ -1658,7 +1658,7 @@ export default function AdminPage() {
             </div>
           </div>
           <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "categories" ? "" : "hidden"}`}>
-            <h2 className="font-semibold">菜品类型管理</h2>
+            <h2 className="font-semibold">{t("admin.settings.categoriesTitle")}</h2>
             <p className="mt-1 text-xs text-zinc-500">支持新增、删除、拖拽排序，排序结果会同步到用户点餐端。</p>
             <div className="mt-2 flex gap-2">
               <input
@@ -1707,7 +1707,7 @@ export default function AdminPage() {
             </div>
           </div>
           <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "backup" ? "" : "hidden"}`}>
-            <h2 className="font-semibold">备份管理</h2>
+            <h2 className="font-semibold">{t("admin.settings.backupTitle")}</h2>
             <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-3">
               <h3 className="text-sm font-semibold">菜单数据备份/恢复（ZIP）</h3>
               <p className="mt-1 text-xs text-zinc-500">导出格式：每道菜一个文件夹，内含 `dish.json` 和图片文件；可直接用于一键恢复。</p>
@@ -1768,7 +1768,7 @@ export default function AdminPage() {
             </div>
           </div>
           <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "email" ? "" : "hidden"}`}>
-            <h2 className="font-semibold">邮件设置</h2>
+            <h2 className="font-semibold">{t("admin.settings.emailTitle")}</h2>
             <p className="mt-1 text-xs text-zinc-500">以下配置保存后由服务器使用；发件需使用邮箱 SMTP 授权码。</p>
             <label className="mt-3 flex items-center gap-2 text-sm">
               <input
@@ -1832,7 +1832,7 @@ export default function AdminPage() {
             </div>
           </div>
           <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "system" ? "" : "hidden"}`}>
-            <h2 className="font-semibold">系统设置</h2>
+            <h2 className="font-semibold">{t("admin.settings.systemTitle")}</h2>
             <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm">
               <input
                 type="checkbox"
@@ -1950,7 +1950,7 @@ export default function AdminPage() {
             </div>
           </div>
           <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "users" ? "" : "hidden"}`}>
-            <h2 className="font-semibold">用户管理</h2>
+            <h2 className="font-semibold">{t("admin.settings.usersTitle")}</h2>
             <div className="mt-8 border-t border-zinc-200 pt-6">
               <h3 className="font-semibold">修改后台密码</h3>
               <form className="mt-2 space-y-2" action={changePassword}>
