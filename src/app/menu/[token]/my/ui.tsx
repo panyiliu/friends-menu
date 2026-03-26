@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useI18n } from "@/i18n";
 
 type Order = {
@@ -14,8 +13,21 @@ type Order = {
 };
 
 export default function GuestMyOrdersClient({ token }: { token: string }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const statusText = (status: Order["status"]) => t(`guest.my.status.${status}`);
+  const categoryNameMapEn: Record<string, string> = {
+    热菜: "Hot Dishes",
+    凉菜: "Cold Dishes",
+    汤品: "Soups",
+    小食: "Snacks",
+    西餐: "Western",
+    中餐: "Chinese",
+    饮品: "Drinks",
+    甜品: "Desserts",
+    主食: "Staples",
+    未分类: "Uncategorized",
+  };
+  const displayCategoryName = (name: string) => (lang === "en" ? (categoryNameMapEn[name] || name) : name);
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [guestId, setGuestId] = useState("");
@@ -67,10 +79,7 @@ export default function GuestMyOrdersClient({ token }: { token: string }) {
       <div className="mx-auto max-w-3xl">
         <section className="rounded-3xl border border-amber-100 bg-gradient-to-r from-orange-50 via-amber-50 to-white p-5 shadow-sm">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-black tracking-tight text-stone-800">{t("guest.my.title")}</h1>
-              <LanguageSwitcher />
-            </div>
+            <h1 className="text-2xl font-black tracking-tight text-stone-800">{t("guest.my.title")}</h1>
             <Link className="rounded-full border border-stone-200/80 bg-white/70 px-4 py-2 text-sm font-medium text-stone-700 transition hover:border-amber-300 hover:bg-white hover:shadow-sm" href={`/menu/${token}`}>
               {t("guest.my.backToMenu")}
             </Link>
@@ -111,7 +120,7 @@ export default function GuestMyOrdersClient({ token }: { token: string }) {
                 }, {}),
               ).map(([catName, items]) => (
                 <div key={catName} className="rounded-2xl border border-amber-100/70 bg-amber-50/40 p-3">
-                  <p className="text-xs font-semibold text-amber-800">{catName}</p>
+                  <p className="text-xs font-semibold text-amber-800">{displayCategoryName(catName)}</p>
                   <ul className="mt-2 space-y-1">
                     {items.map((i) => (
                       <li key={i.id}>

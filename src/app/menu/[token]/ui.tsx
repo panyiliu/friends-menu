@@ -28,7 +28,7 @@ type UiConfig = {
 };
 
 export default function GuestMenuClient({ token }: { token: string }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [categories, setCategories] = useState<Category[]>([]);
   const [showPrice, setShowPrice] = useState(false);
   const [cart, setCart] = useState<Cart>({});
@@ -150,11 +150,24 @@ export default function GuestMenuClient({ token }: { token: string }) {
         : "text-center";
   const resolvedGuestName = (inviteGuestName || t("guest.menu.defaultGuestName")).trim() || t("guest.menu.defaultGuestName");
   const withFriendName = (text: string) => String(text || "").replace(/\{\{\s*friendName\s*\}\}/gi, resolvedGuestName);
+  const categoryNameMapEn: Record<string, string> = {
+    热菜: "Hot Dishes",
+    凉菜: "Cold Dishes",
+    汤品: "Soups",
+    小食: "Snacks",
+    西餐: "Western",
+    中餐: "Chinese",
+    饮品: "Drinks",
+    甜品: "Desserts",
+    主食: "Staples",
+    未分类: "Uncategorized",
+  };
+  const displayCategoryName = (name: string) => (lang === "en" ? (categoryNameMapEn[name] || name) : name);
 
   const add = (id: string) => {
     setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }));
     const dish = dishes.find((d) => d.id === id);
-    if (dish) showToast(`✨ 添加 ${dish.name}`, 900);
+    if (dish) showToast(`✨ ${t("guest.menu.add")} ${dish.name}`, 900);
   };
   const incr = (id: string) => setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }));
   const decr = (id: string) =>
@@ -383,29 +396,31 @@ export default function GuestMenuClient({ token }: { token: string }) {
         <div className="relative mb-8 overflow-hidden rounded-3xl border border-amber-100/80 shadow-sm">
           {uiConfig.guestBannerUrl ? (
             <div className="absolute inset-0">
-              <Image src={uiConfig.guestBannerUrl} alt="banner" fill sizes="100vw" loading="eager" className="object-cover" />
+              <Image src={uiConfig.guestBannerUrl} alt={t("guest.menu.bannerAlt")} fill sizes="100vw" loading="eager" className="object-cover" />
             </div>
           ) : (
             <div className="absolute inset-0 bg-gradient-to-r from-orange-100/70 via-amber-100/60 to-white" />
           )}
           <div className="absolute inset-0 bg-gradient-to-r from-white/85 via-white/60 to-white/35" />
-          <div className="relative flex min-h-24 items-start justify-between gap-3 p-4 sm:min-h-28 sm:p-5">
+          <div className="relative flex min-h-24 flex-wrap items-start justify-between gap-3 p-4 sm:min-h-28 sm:p-5">
             <div className="min-w-0 flex-1 pr-2">
               <div className="mb-1 flex items-center gap-2">
                 <div className="h-8 w-2 rounded-full bg-gradient-to-b from-orange-400 to-amber-500" />
-                <h1 className="bg-gradient-to-r from-stone-800 via-amber-800 to-orange-700 bg-clip-text text-3xl font-bold tracking-tight text-transparent md:text-4xl">
+                <h1 className="bg-gradient-to-r from-stone-800 via-amber-800 to-orange-700 bg-clip-text text-2xl font-bold tracking-tight text-transparent sm:text-3xl md:text-4xl">
                   {uiConfig.guestTitle || t("guest.brand.titleDefault")}
                 </h1>
               </div>
-              <p className="mt-1 flex items-center gap-2 text-sm text-stone-500">{uiConfig.guestSubtitle || t("guest.brand.subtitleDefault")}</p>
+              <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-500">{uiConfig.guestSubtitle || t("guest.brand.subtitleDefault")}</p>
             </div>
-            <Link
-              href={`/menu/${token}/my`}
-              className="group shrink-0 rounded-full border border-stone-200/80 bg-white/70 px-3 py-1.5 text-sm font-medium text-stone-600 backdrop-blur-sm transition-all duration-300 hover:border-amber-300 hover:bg-white hover:shadow-md sm:px-4 sm:py-2"
-            >
-              <span>{t("guest.menu.myOrders")}</span>
-            </Link>
-            <LanguageSwitcher className="ml-2" />
+            <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
+              <Link
+                href={`/menu/${token}/my`}
+                className="group rounded-full border border-stone-200/80 bg-white/70 px-3 py-1.5 text-sm font-medium text-stone-600 backdrop-blur-sm transition-all duration-300 hover:border-amber-300 hover:bg-white hover:shadow-md sm:px-4 sm:py-2"
+              >
+                <span>{t("guest.menu.myOrders")}</span>
+              </Link>
+              <LanguageSwitcher />
+            </div>
           </div>
         </div>
 
@@ -418,7 +433,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
                   className={`category-btn whitespace-nowrap px-5 py-2 text-sm font-medium transition-all ${currentCategoryId === c.id ? "active" : "text-stone-600"}`}
                   onClick={() => jumpToCategory(c.id)}
                 >
-                  {c.name}
+                  {displayCategoryName(c.name)}
                 </button>
               ))}
             </div>
@@ -437,7 +452,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
             >
               <div className="mb-4 flex items-center gap-2 px-1">
                 <div className="h-6 w-1.5 rounded-full bg-orange-400" />
-                <h2 className="text-xl font-semibold tracking-tight text-stone-800">{cat.name}</h2>
+                <h2 className="text-xl font-semibold tracking-tight text-stone-800">{displayCategoryName(cat.name)}</h2>
                 <span className="rounded-full bg-stone-100/70 px-2 py-0.5 text-xs font-medium text-stone-400">{cat.dishes.length}</span>
               </div>
 
@@ -493,7 +508,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
             {hydrated ? totalCount : 0}
           </span>
           <span className="absolute inset-0 rounded-full bg-white/20 opacity-0 blur-sm transition-opacity duration-300 group-hover:opacity-100" />
-          <span className="relative font-bold">袋</span>
+          <span className="relative font-bold">{t("guest.menu.cartBagLabel")}</span>
         </button>
       </div>
 
@@ -548,13 +563,13 @@ export default function GuestMenuClient({ token }: { token: string }) {
           <div className="rounded-t-3xl border-t border-stone-100/80 bg-stone-50/40 p-6">
             {showPrice ? (
               <div className="mb-4 flex items-center justify-between">
-                <span className="font-medium text-stone-600">合计金额</span>
+                <span className="font-medium text-stone-600">{t("guest.menu.totalAmount")}</span>
                 <span className="text-2xl font-bold tracking-tight text-orange-600">¥{Math.round(totalPrice)}</span>
               </div>
             ) : null}
             <div className="space-y-3">
               {inviteGuestName ? (
-                <div className="premium-input w-full px-4 py-3 text-sm font-medium text-stone-700">点餐人：{resolvedGuestName}</div>
+                <div className="premium-input w-full px-4 py-3 text-sm font-medium text-stone-700">{t("guest.menu.orderGuest", { name: resolvedGuestName })}</div>
               ) : null}
               <input type="text" placeholder={t("guest.menu.etaPlaceholder")} className="premium-input w-full px-4 py-3 text-sm" value={eta} onChange={(e) => setEta(e.target.value)} />
               <textarea rows={2} placeholder={t("guest.menu.notePlaceholder")} className="premium-input w-full resize-none px-4 py-3 text-sm" value={note} onChange={(e) => setNote(e.target.value)} />
@@ -563,7 +578,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
                 disabled={loading}
                 onClick={submit}
               >
-                优雅提交菜单
+                {loading ? t("guest.menu.submitting") : t("guest.menu.submitElegant")}
               </button>
               {cartItems.length > 0 ? (
                 <button className="w-full rounded-2xl border border-zinc-200 bg-white py-3 text-sm text-zinc-700 hover:bg-zinc-50" onClick={clearAll}>

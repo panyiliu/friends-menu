@@ -31,7 +31,13 @@
       "cartEmptyToast": "Your cart is empty. Add at least one dish first.",
       "submitSuccess": "Submitted. Synced to the admin panel.",
       "submitSuccessToast": "Order submitted",
-      "submitFail": "Submit failed"
+      "submitFail": "Submit failed",
+      "submitElegant": "Submit Order",
+      "submitting": "Submitting...",
+      "totalAmount": "Total",
+      "orderGuest": "Guest: {name}",
+      "cartBagLabel": "Bag",
+      "bannerAlt": "Order banner"
     },
     "my": {
       "title": "My Orders",

@@ -13,7 +13,8 @@
       "clear": "Clear",
       "expand": "Expand",
       "collapse": "Collapse",
-      "back": "Back"
+      "back": "Back",
+      "switchLanguage": "Switch Language"
     }
   }
 }

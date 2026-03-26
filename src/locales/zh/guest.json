@@ -31,7 +31,13 @@
       "cartEmptyToast": "菜单还是空的，请先添加菜品",
       "submitSuccess": "提交成功，已同步到后台。",
       "submitSuccessToast": "菜单已提交",
-      "submitFail": "提交失败"
+      "submitFail": "提交失败",
+      "submitElegant": "优雅提交菜单",
+      "submitting": "提交中...",
+      "totalAmount": "合计金额",
+      "orderGuest": "点餐人：{name}",
+      "cartBagLabel": "袋",
+      "bannerAlt": "点餐横幅"
     },
     "my": {
       "title": "我的订单",
