@@ -5,5 +5,15 @@ yarn-debug.log*
 yarn-error.log*
 .git
 .gitignore
+.env
+.env.*
 backup-before-restore
 temp-restore-check
+
+# runtime data (persist via Docker volumes, not part of build)
+prisma/dev.db
+public/uploads/
+logs/
+
+# big menu dataset drafts / generated backups (not needed for production image build)
+2222/

@@ -1,11 +1,12 @@
 const { PrismaClient } = require("@prisma/client");
 const bcrypt = require("bcryptjs");
-const { customAlphabet } = require("nanoid");
 
 const prisma = new PrismaClient();
-const nanoid = customAlphabet("1234567890abcdefghijklmnopqrstuvwxyz", 12);
 
 async function main() {
+  const { customAlphabet } = await import("nanoid");
+  const nanoid = customAlphabet("1234567890abcdefghijklmnopqrstuvwxyz", 12);
+
   const passwordHash = await bcrypt.hash("admin123456", 10);
   await prisma.adminUser.upsert({
     where: { username: "admin" },

@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
     const response = NextResponse.json({ ok: true });
     // 不论通过 HTTP/IP 还是 HTTPS/域名访问，都能稳定携带会话 cookie
-    applyAdminSessionCookie(response, user.username, false);
+    applyAdminSessionCookie(response, user.username);
     await logInfo("admin_login_success", { username: user.username, ip });
     return response;
   } catch (error) {

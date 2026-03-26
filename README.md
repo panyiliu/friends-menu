@@ -44,13 +44,7 @@ npm run prisma:seed
 npm run dev
 ```
 
-默认监听 **`http://localhost:3000`**。若需与 Docker 宿主机端口一致（5223），可执行：
-
-```bash
-npm run dev:5223
-```
-
-（等价于 `npx next dev -p 5223`。）
+默认监听 **`http://localhost:3000`**。如需改用其他端口，可直接运行：`npx next dev -p <PORT>`。
 
 4) 生产模式本地验证（可选）
 
@@ -125,28 +119,24 @@ npm run start:prod
 
 ## Docker 部署
 
-### 数据与配置分别放在哪（改 .env / git pull 会不会坏数据）
+### 数据与配置分别放在哪（named volumes 不影响 git pull）
 
 | 位置 | 内容 | `git pull` 后 |
 |------|------|----------------|
-| 宿主机目录 **`./prisma/`**（挂载到容器） | SQLite `dev.db`、迁移文件 | **不会**被 `git pull` 覆盖；只要不删该目录，重建容器数据仍在。 |
-| 宿主机目录 **`./public/uploads/`** | 菜品等上传图片 | 同上。 |
-| 仓库里的 **`docker-compose.yml`** | 服务定义；端口等用 **`HOST_PORT`** 等变量引用 | 建议**不要**在服务器上手工改 compose，避免与远程冲突；改端口只改 **`.env`**。 |
-| **`/.env`**（自己创建，Git 不跟踪） | `HOST_PORT`、`ADMIN_SESSION_SECRET`、`ADMIN_SESSION_SECURE` 等 | 拉代码**不会**覆盖你的 `.env`。 |
+| Docker named volume `friends-menu-data` | SQLite `dev.db`（以及迁移所需写入） | **不会**被覆盖 |
+| Docker named volume `friends-menu-uploads` | 上传图片 `public/uploads` | 同上 |
+| 仓库里的 `docker-compose.yml` | 服务定义；端口用 `HOST_PORT` 映射 | 建议**不要**在服务器上手工改 compose |
+| **`.env`**（可选，Git 不跟踪） | `HOST_PORT`、`REQUIRE_NON_DEFAULT_ADMIN_PASSWORD`、`AUTO_SEED_IF_EMPTY` 等 | 拉代码不覆盖你的 `.env` |
 
 **改环境变量会怎样（数据是否损坏）**
 
-- 只改 **`HOST_PORT`**：仅访问端口变化，**数据库与图片不变**。
-- 改 **`ADMIN_SESSION_SECRET`**：旧 Cookie 全部失效，需**重新登录**，**不损坏**库里的数据。
-- 改 **`ADMIN_SESSION_SECURE`**：若与当前访问协议（HTTP/HTTPS）不一致，可能表现为登不进，**不损坏**数据。
+- 只改 **`HOST_PORT`**：仅访问端口变化，数据库与图片不变。
+- 改 **`ADMIN_SESSION_SECRET`**：用于后台会话验签。若显式设置则会导致旧 Cookie 失效（需重新登录），但不会损坏数据库。
 
 **与 Git 协作**
 
-- 推荐：服务器上 **`cp .env.example .env`**，只编辑 `.env`；**不要**把密钥提交进仓库。
-- 若 `git pull` 提示会覆盖你改过的 `docker-compose.yml`，可用 `git stash` 暂存后拉取再合并，或放弃本地对 compose 的修改、改用 `.env` 满足需求。
-- **切勿**对宿主机上的 `prisma/dev.db` 或 `public/uploads/` 执行 `git restore` / 强制覆盖，以免清空运行数据。
-
-变量说明见仓库根目录 **[`.env.example`](.env.example)**。
+- 无需创建 `.env` 也能启动：`ADMIN_SESSION_SECRET` 会在容器 entrypoint 自动生成并持久化。
+- 若需要覆盖端口/HTTPS Cookie，再创建 `.env` 或在命令前临时设置环境变量即可。
 
 ### 全新服务器（已安装 Git、Docker、Docker Compose）
 
@@ -156,10 +146,9 @@ npm run start:prod
 cd /opt
 git clone https://github.com/<你的用户名>/<仓库名>.git friends-menu
 cd friends-menu
-cp .env.example .env
 ```
 
-编辑 **`.env`**：至少设置 **`ADMIN_SESSION_SECRET`**（≥24 位随机串）；若用浏览器 **HTTP** 访问 `http://IP:端口`，将 **`ADMIN_SESSION_SECURE=false`**；需要改对外端口时改 **`HOST_PORT`**（默认 5223）。
+（可选）如需覆盖端口，可创建 `.env`；不创建也能启动（`ADMIN_SESSION_SECRET` 会自动生成并持久化）。
 
 ```bash
 docker compose up -d --build
@@ -169,11 +158,11 @@ docker compose up -d --build
 - `prisma migrate deploy`（保证表结构就绪）
 - 当数据库为空时自动执行一次 seed（创建默认管理员等初始数据）
 
-普通用户默认不需要手动再执行 migrate/seed。若想禁用自动 seed，可在 `.env` 里设置 `AUTO_SEED_IF_EMPTY=false`。
+普通用户默认不需要手动再执行 migrate/seed。若想禁用自动 seed，可设置环境变量 `AUTO_SEED_IF_EMPTY=false`（可选通过 `.env`）。
 
-浏览器访问 **`http://<服务器IP>:<HOST_PORT>`**（默认 5223），后台 **`/admin/login`**，默认账号见上文「默认账号」。
+浏览器访问 **`http://<服务器IP>:<HOST_PORT>`**（默认 3000），后台 **`/admin/login`**，默认账号见上文「默认账号」。
 
-升级新版本：在同一目录 **`git pull`** 后执行 **`docker compose up -d --build`**。数据仍在挂载目录中。
+升级新版本：在同一目录 **`git pull`** 后执行 **`docker compose up -d --build`**。数据仍在 named volumes 中。
 
 ### 本地打包运行
 
@@ -181,39 +170,35 @@ docker compose up -d --build
 docker compose up -d --build
 ```
 
-访问：`http://<服务器IP>:<HOST_PORT>`（默认 5223，见 `.env` / `.env.example`）
+访问：`http://<服务器IP>:<HOST_PORT>`（默认 3000）
 
 ### 说明
 
-- 生产模式下，数据库与上传目录通过宿主机挂载持久化：
-  - `./prisma:/app/prisma`
-  - `./public/uploads:/app/public/uploads`
-- 这两个目录属于运行数据，不建议再通过 Git 传输与合并。
+- 生产模式下，数据库与上传目录通过 Docker named volumes 持久化（无需宿主机提前准备目录）：
+  - SQLite：`friends-menu-data` 挂载到容器 `/app/data`，并由 entrypoint 将 `/app/prisma/dev.db` 指向卷内文件
+  - 上传图片：`friends-menu-uploads` 挂载到容器 `/app/public/uploads`
+- 这些运行数据不建议通过 Git 传输与合并。
 - 容器内数据库连接使用绝对路径：`file:/app/prisma/dev.db`，可避免某些环境下相对路径导致的“Unable to open the database file”。
-- 后台登录 cookie 的 `Secure` 开关由 `ADMIN_SESSION_SECURE` 控制；HTTP 内网访问请设为 `false`，HTTPS 域名访问可设为 `true`。
-- 默认 compose 为新手场景内置 `ADMIN_SESSION_SECURE=false`（便于 HTTP 直连）。若上生产 HTTPS，请改成 `true`。
+- 后台登录 cookie 的 `Secure` 标记固定为 `false`，因此在 HTTP/IP 直连与 HTTPS 反代场景下都可以保持兼容行为（但相对安全性会略低于始终启用 Secure 的方案）。
 - 启动入口会自动执行 `migrate deploy`；空库时自动 seed，一般无需再手工执行初始化命令。
-- 公网部署建议使用独立反向代理（Nginx/Caddy）终止 HTTPS，并将 `ADMIN_SESSION_SECURE=true`。
-- 健康检查接口：`/api/health`（建议配置到反代或容器探活）。
+- 公网部署建议使用独立反向代理（Nginx/Caddy）终止 HTTPS；本项目后台会话 Cookie 的 `Secure` 标记固定为 `false`，无需额外配置开关。
+- 健康检查接口：`/health`（建议配置到反代或容器探活；同时保留 `/api/health` 兼容）。
 - **ZIP 备份/恢复** 经 Nginx 时，请增大请求体上限，例如：`client_max_body_size 64m;`（或更大），否则大 ZIP 上传会失败；Next 侧已配置 `experimental.proxyClientMaxBodySize` 为 50mb。
 - 若容器内恢复 ZIP 时需从**公网 URL** 拉取原图，可配置 `PUBLIC_SITE_URL`（对外站点根 URL）与 `INTERNAL_BASE_URL`（容器内可访问的站点根 URL，如 `http://127.0.0.1:3000`），详见 [`docs/tech-auth.md`](docs/tech-auth.md)。
 
 ### 生产环境必设变量（公网）
 
 ```bash
-ADMIN_SESSION_SECRET=请替换为至少24位随机串
-ADMIN_SESSION_SECURE=true
-DATABASE_URL=file:/app/prisma/dev.db
 REQUIRE_NON_DEFAULT_ADMIN_PASSWORD=false
 AUTO_SEED_IF_EMPTY=true
+# ADMIN_SESSION_SECRET 可选：不设置会由容器 entrypoint 自动生成并持久化
 # 可选：ZIP 恢复时容器内拉取图片
 # PUBLIC_SITE_URL=https://你的域名
 # INTERNAL_BASE_URL=http://127.0.0.1:3000
 ```
 
 说明：
-- 生产模式下若 `ADMIN_SESSION_SECRET` 过短/默认值，服务会拒绝启动。
-- 生产模式下要求 `ADMIN_SESSION_SECURE=true`，避免后台 Cookie 在 HTTP 明文传输。
+- 生产模式下会启用 `ADMIN_SESSION_SECRET` 的安全校验（避免默认值/过短密钥）。
 
 ### 常用命令
 
@@ -234,7 +219,7 @@ docker compose restart
 
 - Git 仅存放代码与配置
 - 运行数据（`prisma/dev.db`、`public/uploads`）不进 Git
-- 通过备份脚本保障可恢复
+- 通过应用内 ZIP 备份/恢复保障可恢复（Docker named volumes 的数据也可用导出方式备份）
 
 ### 升级与发布
 
@@ -249,17 +234,10 @@ bash scripts/rollback-release.sh /home/ethan/docker/friends-menu <prev_sha>
 ```
 
 ### 数据备份
-
-```bash
-bash scripts/backup-data.sh /home/ethan/docker/friends-menu /home/ethan/docker/friends-menu/backups
-```
+推荐使用后台“设置 -> 系统设置”中的 ZIP 备份/恢复；它与 Docker 数据持久化方式无关，更可靠。
 
 ### 数据恢复
-
-```bash
-bash scripts/restore-data.sh /home/ethan/docker/friends-menu /home/ethan/docker/friends-menu/backups/20260324-120000
-docker compose up -d
-```
+同上：使用后台“一键恢复 ZIP”完成恢复。
 
 后台“设置 -> 系统设置”中也提供 ZIP 备份/恢复：
 - 一键备份 ZIP
@@ -292,4 +270,4 @@ git pull
 - 可选禁用默认后台密码：设置 `REQUIRE_NON_DEFAULT_ADMIN_PASSWORD=true` 后，生产环境会阻止 `admin/admin123456` 登录。
 - 登录防爆破：登录接口启用 IP + 账号维度限流。
 - 管理端 API 限流：`/api/admin/*` 在网关层和应用层均建议开启限流。
-- 日志落盘：应用运行日志写入 `logs/app.log`（JSON 行格式）。
+- 日志输出：应用运行日志输出到容器 `stdout/stderr`（JSON 行格式）。

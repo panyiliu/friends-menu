@@ -7,7 +7,7 @@
 | 名称 | `admin_session` |
 | 值格式 | `{payload}.{signatureHex}`，其中 `payload` 为 `{username}|{timestampMs}`，`signatureHex` 为 HMAC-SHA256(secret, payload) 的十六进制字符串。 |
 | 签名算法 | HMAC-SHA256，密钥为 `ADMIN_SESSION_SECRET`。 |
-| 属性 | `HttpOnly`、`SameSite=Lax`、`Path=/`、`Max-Age` 约 7 天；`Secure` 由 `ADMIN_SESSION_SECURE` 决定。 |
+| 属性 | `HttpOnly`、`SameSite=Lax`、`Path=/`、`Max-Age` 约 7 天；`Secure` 固定为 `false`。 |
 
 ## 校验位置
 
@@ -20,7 +20,6 @@
 | 变量 | 说明 |
 |------|------|
 | `ADMIN_SESSION_SECRET` | 生产环境必填，长度 ≥ 24，且不能为默认占位值。 |
-| `ADMIN_SESSION_SECURE` | 生产环境必须为 `true` **当且仅当** 用户浏览器始终以 HTTPS 访问；纯 HTTP 直连调试时设为 `false`。 |
 | `DATABASE_URL` | SQLite 连接串等。 |
 | `INTERNAL_BASE_URL` | （可选）容器内访问自身站点时的基址，例如 `http://127.0.0.1:3000`，与 `PUBLIC_SITE_URL` 配合在恢复 ZIP 时回退拉取图片。 |
 | `PUBLIC_SITE_URL` | （可选）对外访问的根 URL（无尾斜杠），例如 `https://menu.example.com`；与 `INTERNAL_BASE_URL` 成对配置时，恢复会将公网图片 URL 改写为内网再 `fetch`。 |

@@ -19,8 +19,8 @@
 
 | 场景 | 建议 |
 |------|------|
-| **公网 HTTPS**（域名 + 证书） | 设置 `ADMIN_SESSION_SECURE=true`，用户始终通过 `https://` 访问。 |
-| **内网 HTTP 调试**（如 `http://IP:5223`） | 必须设置 `ADMIN_SESSION_SECURE=false`，否则浏览器可能拒绝保存或发送 Secure Cookie，表现为「登录后仍回到登录页」。 |
+| **公网 HTTPS**（域名 + 证书） | 本项目后台会话 Cookie 的 `Secure` 标记固定为 `false`，因此无需再为 HTTP/HTTPS 额外配置开关；确保反向代理正常转发即可。 |
+| **内网 HTTP 调试**（如 `http://IP:HOST_PORT`） | 同上：无需配置额外开关即可正常登录。 |
 | **HTTPS 终止在 Nginx/Caddy** | 反向代理需转发 `X-Forwarded-Proto: https`（及 `Host`），并保证 Next 能识别真实协议（见技术设计文档）。 |
 
 ## 备份与恢复（ZIP）

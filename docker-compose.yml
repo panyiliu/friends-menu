@@ -7,11 +7,10 @@ services:
         BUILD_TIME: ${BUILD_TIME:-}
     container_name: ${CONTAINER_NAME:-friends-menu}
     ports:
-      - "${HOST_PORT:-5223}:3000"
+      - "${HOST_PORT:-3000}:3000"
     environment:
       - DATABASE_URL=file:/app/prisma/dev.db
-      - ADMIN_SESSION_SECURE=${ADMIN_SESSION_SECURE:-false}
-      - ADMIN_SESSION_SECRET=${ADMIN_SESSION_SECRET:-replace_with_a_long_random_secret_please_change}
+      # NOTE: ADMIN_SESSION_SECRET 由 entrypoint 自动生成（避免用户必须创建 .env）
       - REQUIRE_NON_DEFAULT_ADMIN_PASSWORD=${REQUIRE_NON_DEFAULT_ADMIN_PASSWORD:-false}
       - AUTO_SEED_IF_EMPTY=${AUTO_SEED_IF_EMPTY:-true}
       # 可选：ZIP 恢复时容器内拉取原站图片（见 docs/tech-auth.md）
@@ -19,5 +18,28 @@ services:
       - INTERNAL_BASE_URL=${INTERNAL_BASE_URL:-}
     restart: unless-stopped
     volumes:
-      - ./prisma:/app/prisma
-      - ./public/uploads:/app/public/uploads
+      - friends-menu-data:/app/data
+      - friends-menu-uploads:/app/public/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "node -e 'fetch(\"http://localhost:3000/health\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  friends-menu-data:
+  friends-menu-uploads:

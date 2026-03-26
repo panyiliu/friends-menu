@@ -1,6 +1,3 @@
-import { appendFile, mkdir } from "fs/promises";
-import path from "path";
-
 type Level = "INFO" | "WARN" | "ERROR";
 
 const RING_MAX = 400;
@@ -33,10 +30,10 @@ async function writeLog(level: Level, message: string, meta?: Record<string, unk
     ...(meta || {}),
   });
   pushRing(line);
+  // Production规范：日志必须输出到 stdout/stderr，便于容器运行时采集。
   try {
-    const logDir = path.join(process.cwd(), "logs");
-    await mkdir(logDir, { recursive: true });
-    await appendFile(path.join(logDir, "app.log"), `${line}\n`, "utf8");
+    if (level === "ERROR") console.error(line);
+    else console.log(line);
   } catch {
     // Never block request flow due to logging failure.
   }
