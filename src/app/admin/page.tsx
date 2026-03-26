@@ -1,6 +1,8 @@
 "use client";
 
 import { DebugLogPanel } from "@/components/DebugLogPanel";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useI18n } from "@/i18n";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -77,11 +79,6 @@ type AdminUser = {
 };
 
 const tabs = ["menu", "orders", "settings"] as const;
-const tabLabel: Record<(typeof tabs)[number], string> = {
-  menu: "菜单",
-  orders: "订单",
-  settings: "设置",
-};
 
 const defaultWelcomeTemplate: WelcomeTemplate = {
   welcomeEnabled: true,
@@ -96,6 +93,7 @@ const defaultWelcomeTemplate: WelcomeTemplate = {
 };
 
 export default function AdminPage() {
+  const { t } = useI18n();
   const [tab, setTab] = useState<(typeof tabs)[number]>("menu");
   const [categories, setCategories] = useState<Category[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
@@ -166,7 +164,7 @@ export default function AdminPage() {
   const [debugUi, setDebugUi] = useState(false);
   const [backendVersion, setBackendVersion] = useState<{ gitSha: string; buildTime: string } | null>(null);
 
-  const statusText = (status: Order["status"]) => (status === "PENDING" ? "待备餐" : status === "PREPARING" ? "备餐中" : "已完成");
+  const statusText = (status: Order["status"]) => t(`guest.my.status.${status}`);
   const inviteLink = useMemo(() => (invite?.token ? `${globalThis.location?.origin || ""}/menu/${invite.token}` : ""), [invite]);
   const normalizeSingleTag = (input: unknown) => String(input || "").split(",")[0]?.trim() || "";
   const availableTagSet = useMemo(() => {
@@ -184,7 +182,7 @@ export default function AdminPage() {
     if (g && l) return `${g} · ${l}`;
     if (g) return g;
     if (l) return l;
-    return "未命名链接";
+    return t("admin.links.unnamed");
   }
 
   const safeJson = async (res: Response) => {
@@ -318,7 +316,7 @@ export default function AdminPage() {
     const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
     const up = await safeJson(res);
     if (!up.ok) {
-      setMessage(up.message || "图片上传失败");
+      setMessage(up.message || t("errors.UPLOAD_FAILED"));
       return "";
     }
     return String(up.url || "");
@@ -345,7 +343,7 @@ export default function AdminPage() {
     });
     const data = await safeJson(res);
     if (!data.ok) {
-      setMessage(data.message || "保存失败");
+      setMessage(data.message || t("errors.SAVE_FAILED"));
       setIsSavingDish(false);
       return;
     }
@@ -357,7 +355,7 @@ export default function AdminPage() {
     setDrawerFile(null);
     setTab("menu");
     setIsCreatingDish(false);
-    setMessage("菜品已保存");
+    setMessage(t("admin.toast.dishSaved"));
     setIsSavingDish(false);
   }
 
@@ -367,7 +365,7 @@ export default function AdminPage() {
     const res = await fetch(`/api/admin/dishes?id=${id}`, { method: "DELETE" });
     const d = await safeJson(res);
     if (!d.ok) {
-      setMessage(d.message || "删除失败");
+      setMessage(d.message || t("errors.DELETE_FAILED"));
       setIsDeletingDish(false);
       return;
     }
@@ -376,7 +374,7 @@ export default function AdminPage() {
       setDrawerOpen(false);
     }
     await refresh();
-    setMessage("菜品已删除");
+    setMessage(t("admin.toast.dishDeleted"));
     setIsDeletingDish(false);
   }
 
@@ -902,7 +900,7 @@ export default function AdminPage() {
   if (!authedChecked) {
     return (
       <main className="min-h-screen bg-zinc-50">
-        <div className="mx-auto max-w-6xl p-6 text-sm text-zinc-500">正在校验登录状态...</div>
+        <div className="mx-auto max-w-6xl p-6 text-sm text-zinc-500">{t("admin.session.checking")}</div>
       </main>
     );
   }
@@ -932,21 +930,28 @@ export default function AdminPage() {
       <div className="mx-auto max-w-6xl p-4 pb-8">
       <div className="relative overflow-hidden rounded-3xl border border-amber-100/80 bg-gradient-to-r from-orange-50 via-amber-50 to-white p-5 shadow-md">
         <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-full bg-orange-100/60 blur-2xl" />
-        <h1 className="bg-gradient-to-r from-stone-800 via-amber-700 to-orange-600 bg-clip-text text-3xl font-black tracking-tight text-transparent">{settings.adminTitle || "点餐系统"}</h1>
-        <p className="mt-1 text-xs text-stone-500">后厨管理控制台 · 臻选风味</p>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="bg-gradient-to-r from-stone-800 via-amber-700 to-orange-600 bg-clip-text text-3xl font-black tracking-tight text-transparent">
+              {settings.adminTitle || t("admin.brand.defaultTitle")}
+            </h1>
+            <p className="mt-1 text-xs text-stone-500">{t("admin.brand.subtitle")}</p>
+          </div>
+          <LanguageSwitcher />
+        </div>
         <p className="mt-1 text-[11px] text-stone-400">
           {backendVersion
-            ? `后端版本：${backendVersion.gitSha} · ${backendVersion.buildTime.slice(0, 19).replace("T", " ")}`
-            : "后端版本：加载中..."}
+            ? t("admin.brand.backendVersion", { gitSha: backendVersion.gitSha, buildTime: backendVersion.buildTime.slice(0, 19).replace("T", " ") })
+            : t("admin.brand.backendVersionLoading")}
         </p>
         <div className="mt-3 flex flex-wrap gap-2 rounded-2xl border border-stone-100 bg-white/70 p-1 backdrop-blur-sm">
-          {tabs.map((t) => (
-            <button key={t} className={`w-20 rounded-xl px-3 py-2 text-sm font-medium transition md:w-24 ${tab === t ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-700 hover:bg-zinc-50"}`} onClick={() => setTab(t)}>
-              {tabLabel[t]}
+          {tabs.map((tKey) => (
+            <button key={tKey} className={`w-20 rounded-xl px-3 py-2 text-sm font-medium transition md:w-24 ${tab === tKey ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-700 hover:bg-zinc-50"}`} onClick={() => setTab(tKey)}>
+              {t(`admin.tabs.${tKey}`)}
             </button>
           ))}
           <button className="rounded-xl px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-50" onClick={logout}>
-            退出
+            {t("admin.actions.logout")}
           </button>
         </div>
       </div>

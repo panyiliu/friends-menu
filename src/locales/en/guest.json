@@ -1,0 +1,44 @@
+{
+  "guest": {
+    "menu": {
+      "myOrders": "My Orders",
+      "menuLoading": "Loading menu...",
+      "linkUnavailableTitle": "Link unavailable",
+      "linkUnavailableTip1": "Please contact the admin to share a new link.",
+      "linkInvalid": "Invalid link",
+      "menuLoadFailed": "Failed to load menu. Please try again.",
+      "defaultGuestName": "Friend",
+      "needAtLeastOne": "Please add at least one dish.",
+      "add": "Add",
+      "soldOut": "Sold out",
+      "selected": "Selected {qty}",
+      "cartTitle": "Cart",
+      "cartEmptyHint": "Cart is empty · Pick a few favorites",
+      "clearCart": "Clear cart",
+      "etaPlaceholder": "ETA (e.g. 19:00)",
+      "notePlaceholder": "Notes / allergies / spicy level",
+      "cartEmptyToast": "Your cart is empty. Add at least one dish first.",
+      "submitSuccess": "Submitted. Synced to the admin panel.",
+      "submitSuccessToast": "Order submitted",
+      "submitFail": "Submit failed"
+    },
+    "my": {
+      "title": "My Orders",
+      "subtitle": "View your order history under this invite link.",
+      "noHistory": "No history yet. Submit at least one order first.",
+      "loading": "Loading orders...",
+      "none": "No orders yet.",
+      "backToMenu": "Back to menu",
+      "deleteConfirm": "Delete this order? This cannot be undone.",
+      "deleteFail": "Delete failed",
+      "status": {
+        "PENDING": "Pending",
+        "PREPARING": "Preparing",
+        "DONE": "Done"
+      },
+      "categoryUnknown": "Uncategorized",
+      "note": "Note: {note}"
+    }
+  }
+}
+

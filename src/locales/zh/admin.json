@@ -1,0 +1,53 @@
+{
+  "admin": {
+    "debug": {
+      "title": "调试日志",
+      "clearClient": "清空客户端",
+      "serverRecent": "— 服务端（近期）—",
+      "client": "— 客户端 —",
+      "none": "（无）"
+    },
+    "login": {
+      "title": "后台登录",
+      "checkingSession": "正在检测是否已登录…",
+      "passwordPlaceholder": "密码",
+      "submitting": "登录中…",
+      "submit": "登录",
+      "apiNonJson": "登录接口返回异常（非 JSON），请查看终端/服务端日志",
+      "failed": "登录失败",
+      "sessionFail": "密码校验已通过，但浏览器未带上有效会话。请检查：① Docker/生产需在反代上传 X-Forwarded-Proto；② 勿禁用第三方 Cookie（本站为同站，一般无需）。详情见 docs/product-auth.md。",
+      "networkError": "网络或浏览器异常：{msg}",
+      "diagTitle": "登录诊断日志（每步自动记录）",
+      "diagEmpty": "提交登录后将在此显示步骤与 HTTP 状态",
+      "diagControlled": "当前由后台「系统设置 → 显示调试日志面板」统一控制。"
+    },
+    "orders": {
+      "categoryUnknown": "未分类"
+    },
+    "tabs": {
+      "menu": "菜单",
+      "orders": "订单",
+      "settings": "设置"
+    },
+    "actions": {
+      "logout": "退出"
+    },
+    "session": {
+      "checking": "正在校验登录状态..."
+    },
+    "brand": {
+      "defaultTitle": "点餐系统",
+      "subtitle": "后厨管理控制台 · 臻选风味",
+      "backendVersion": "后端版本：{gitSha} · {buildTime}",
+      "backendVersionLoading": "后端版本：加载中..."
+    },
+    "toast": {
+      "dishSaved": "菜品已保存",
+      "dishDeleted": "菜品已删除"
+    },
+    "links": {
+      "unnamed": "未命名链接"
+    }
+  }
+}
+

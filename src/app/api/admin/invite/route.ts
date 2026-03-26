@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     const hint = prismaSchemaHint(error);
     await logError("admin_invite_get_failed", error);
-    return NextResponse.json({ ok: false, message: hint || "读取点餐链接失败，请查看服务端日志" }, { status: 500 });
+    return NextResponse.json({ ok: false, code: "ADMIN_INVITE_GET_FAILED", message: hint || "读取点餐链接失败，请查看服务端日志" }, { status: 500 });
   }
 }
 
@@ -130,17 +130,17 @@ export async function POST(req: NextRequest) {
 
     if (mode === "setActive") {
       const id = String(body.id || "");
-      if (!id) return NextResponse.json({ ok: false, message: "缺少链接ID" }, { status: 400 });
+      if (!id) return NextResponse.json({ ok: false, code: "PARAM_INVALID", message: "缺少链接ID" }, { status: 400 });
       const exists = await prisma.inviteLink.findUnique({ where: { id } });
-      if (!exists) return NextResponse.json({ ok: false, message: "链接不存在" }, { status: 404 });
+      if (!exists) return NextResponse.json({ ok: false, code: "INVITE_NOT_FOUND", message: "链接不存在" }, { status: 404 });
       await prisma.systemSetting.update({ where: { id: setting.id }, data: { activeInviteId: id } });
       return NextResponse.json({ ok: true });
     }
 
     if (mode === "delete") {
       const id = String(body.id || "");
-      if (!id) return NextResponse.json({ ok: false, message: "缺少链接ID" }, { status: 400 });
-      if (setting.activeInviteId === id) return NextResponse.json({ ok: false, message: "当前主链接不能删除" }, { status: 400 });
+      if (!id) return NextResponse.json({ ok: false, code: "PARAM_INVALID", message: "缺少链接ID" }, { status: 400 });
+      if (setting.activeInviteId === id) return NextResponse.json({ ok: false, code: "INVITE_CANNOT_DELETE_ACTIVE", message: "当前主链接不能删除" }, { status: 400 });
       await prisma.inviteLink.delete({ where: { id } });
       return NextResponse.json({ ok: true });
     }
@@ -170,10 +170,10 @@ export async function POST(req: NextRequest) {
     }
 
     await logWarn("admin_invite_update_without_active", { mode });
-    return NextResponse.json({ ok: false, message: "无可更新链接" }, { status: 400 });
+    return NextResponse.json({ ok: false, code: "INVITE_NO_ACTIVE", message: "无可更新链接" }, { status: 400 });
   } catch (error) {
     const hint = prismaSchemaHint(error);
     await logError("admin_invite_post_failed", error);
-    return NextResponse.json({ ok: false, message: hint || "创建/更新链接失败，请查看服务端日志" }, { status: 500 });
+    return NextResponse.json({ ok: false, code: "ADMIN_INVITE_POST_FAILED", message: hint || "创建/更新链接失败，请查看服务端日志" }, { status: 500 });
   }
 }

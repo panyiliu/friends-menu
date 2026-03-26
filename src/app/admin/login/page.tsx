@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useI18n } from "@/i18n";
 
 const MAX_LOG = 50;
 /** 仅在会话检测超过此时间仍无结果时显示「正在检测」，避免闪烁与 Strict Mode 双次执行带来的干扰 */
 const SESSION_CHECK_UI_DELAY_MS = 200;
 
 export default function AdminLoginPage() {
+  const { t } = useI18n();
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
@@ -87,13 +90,13 @@ export default function AdminLoginPage() {
         data = JSON.parse(text) as { ok?: boolean; message?: string };
       } catch {
         log(`响应非 JSON，前 120 字：${text.slice(0, 120).replace(/\s+/g, " ")}`);
-        setMessage("登录接口返回异常（非 JSON），请查看终端/服务端日志");
+        setMessage(t("admin.login.apiNonJson"));
         return;
       }
 
       if (!data.ok) {
-        setMessage(data.message || "登录失败");
-        log(`接口返回失败：${data.message || "无 message"}`);
+        setMessage(data.message || t("admin.login.failed"));
+        log(`接口返回失败：${data.message || t("admin.login.failed")}`);
         return;
       }
 
@@ -104,9 +107,7 @@ export default function AdminLoginPage() {
 
       if (sess.status !== 200) {
         log(`会话校验失败，响应：${sessText.slice(0, 200).replace(/\s+/g, " ")}`);
-        setMessage(
-          "密码校验已通过，但浏览器未带上有效会话。请检查：① Docker/生产需在反代上传 X-Forwarded-Proto；② 勿禁用第三方 Cookie（本站为同站，一般无需）。详情见 docs/product-auth.md。",
-        );
+        setMessage(t("admin.login.sessionFail"));
         return;
       }
 
@@ -115,7 +116,7 @@ export default function AdminLoginPage() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       log(`请求异常：${msg}`);
-      setMessage(`网络或浏览器异常：${msg}`);
+      setMessage(t("admin.login.networkError", { msg }));
     } finally {
       setBusy(false);
     }
@@ -123,8 +124,11 @@ export default function AdminLoginPage() {
 
   return (
     <main className="mx-auto mt-16 max-w-lg rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
-      <h1 className="text-xl font-bold text-zinc-900">后台登录</h1>
-      {sessionRechecking ? <p className="mt-2 text-xs text-zinc-500">正在检测是否已登录…</p> : null}
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-xl font-bold text-zinc-900">{t("admin.login.title")}</h1>
+        <LanguageSwitcher />
+      </div>
+      {sessionRechecking ? <p className="mt-2 text-xs text-zinc-500">{t("admin.login.checkingSession")}</p> : null}
       <input
         className="mt-4 w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900"
         autoComplete="username"
@@ -135,7 +139,7 @@ export default function AdminLoginPage() {
         className="mt-3 w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900"
         type="password"
         autoComplete="current-password"
-        placeholder="密码"
+        placeholder={t("admin.login.passwordPlaceholder")}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
       />
@@ -145,7 +149,7 @@ export default function AdminLoginPage() {
         disabled={busy}
         onClick={() => void submit()}
       >
-        {busy ? "登录中…" : "登录"}
+        {busy ? t("admin.login.submitting") : t("admin.login.submit")}
       </button>
       {message ? (
         <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">{message}</p>
@@ -154,12 +158,12 @@ export default function AdminLoginPage() {
       {debugEnabled ? (
         <div className="mt-6 border-t border-zinc-200 pt-3">
           <button type="button" className="flex w-full items-center justify-between text-left text-sm font-medium text-zinc-700" onClick={() => setLogOpen((v) => !v)}>
-            <span>登录诊断日志（每步自动记录）</span>
-            <span className="text-zinc-400">{logOpen ? "收起" : "展开"}</span>
+            <span>{t("admin.login.diagTitle")}</span>
+            <span className="text-zinc-400">{logOpen ? t("common.actions.collapse") : t("common.actions.expand")}</span>
           </button>
           {logOpen ? (
             <div className="mt-2 max-h-56 overflow-auto rounded-md border border-zinc-200 bg-zinc-950 p-2 font-mono text-[11px] leading-relaxed text-emerald-200/90">
-              {logLines.length === 0 ? <span className="text-zinc-500">提交登录后将在此显示步骤与 HTTP 状态</span> : null}
+              {logLines.length === 0 ? <span className="text-zinc-500">{t("admin.login.diagEmpty")}</span> : null}
               {logLines.map((line, i) => (
                 <div key={i} className="whitespace-pre-wrap break-all">
                   {line}
@@ -167,7 +171,7 @@ export default function AdminLoginPage() {
               ))}
             </div>
           ) : null}
-          <p className="mt-2 text-[11px] text-zinc-400">当前由后台「系统设置 → 显示调试日志面板」统一控制。</p>
+          <p className="mt-2 text-[11px] text-zinc-400">{t("admin.login.diagControlled")}</p>
         </div>
       ) : null}
     </main>

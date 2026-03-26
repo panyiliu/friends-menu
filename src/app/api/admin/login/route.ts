@@ -11,24 +11,24 @@ export async function POST(req: Request) {
     const ipLimiter = takeRateLimit(`login:ip:${ip}`, 12, 5 * 60 * 1000);
     if (!ipLimiter.ok) {
       await logWarn("login_rate_limited_by_ip", { ip });
-      return NextResponse.json({ ok: false, message: "尝试次数过多，请稍后再试" }, { status: 429 });
+      return NextResponse.json({ ok: false, code: "RATE_LIMITED", message: "尝试次数过多，请稍后再试" }, { status: 429 });
     }
     const { username, password } = await req.json();
     const accountLimiter = takeRateLimit(`login:user:${String(username || "")}:${ip}`, 8, 5 * 60 * 1000);
     if (!accountLimiter.ok) {
       await logWarn("login_rate_limited_by_user", { ip, username });
-      return NextResponse.json({ ok: false, message: "尝试次数过多，请稍后再试" }, { status: 429 });
+      return NextResponse.json({ ok: false, code: "RATE_LIMITED", message: "尝试次数过多，请稍后再试" }, { status: 429 });
     }
     const user = await prisma.adminUser.findUnique({ where: { username } });
-    if (!user) return NextResponse.json({ ok: false, message: "账号或密码错误" }, { status: 401 });
+    if (!user) return NextResponse.json({ ok: false, code: "INVALID_CREDENTIALS", message: "账号或密码错误" }, { status: 401 });
     const pass = await bcrypt.compare(password || "", user.passwordHash);
-    if (!pass) return NextResponse.json({ ok: false, message: "账号或密码错误" }, { status: 401 });
+    if (!pass) return NextResponse.json({ ok: false, code: "INVALID_CREDENTIALS", message: "账号或密码错误" }, { status: 401 });
 
     if (process.env.NODE_ENV === "production" && process.env.REQUIRE_NON_DEFAULT_ADMIN_PASSWORD === "true" && user.username === "admin") {
       const usingDefault = await bcrypt.compare("admin123456", user.passwordHash);
       if (usingDefault) {
         await logWarn("default_admin_password_blocked", { ip, username: user.username });
-        return NextResponse.json({ ok: false, message: "生产环境禁止默认密码，请先修改后台密码" }, { status: 403 });
+        return NextResponse.json({ ok: false, code: "DEFAULT_PASSWORD_BLOCKED", message: "生产环境禁止默认密码，请先修改后台密码" }, { status: 403 });
       }
     }
 
@@ -43,6 +43,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         ok: false,
+        code: "ADMIN_LOGIN_FAILED",
         message: `后台登录失败：${msg}`,
       },
       { status: 500 },

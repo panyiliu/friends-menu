@@ -1,0 +1,44 @@
+{
+  "guest": {
+    "menu": {
+      "myOrders": "我的订单",
+      "menuLoading": "菜单加载中...",
+      "linkUnavailableTitle": "链接不可用",
+      "linkUnavailableTip1": "请联系管理员重新分享点餐链接。",
+      "linkInvalid": "链接无效",
+      "menuLoadFailed": "菜单加载失败，请稍后重试",
+      "defaultGuestName": "朋友",
+      "needAtLeastOne": "请先添加至少一道菜",
+      "add": "加入",
+      "soldOut": "售罄",
+      "selected": "已选 {qty}",
+      "cartTitle": "点餐清单",
+      "cartEmptyHint": "菜单空置 · 选几道挚爱吧",
+      "clearCart": "清空菜单",
+      "etaPlaceholder": "预计到访时间 (例如 19:00)",
+      "notePlaceholder": "特殊要求 / 忌口 / 加辣",
+      "cartEmptyToast": "菜单还是空的，请先添加菜品",
+      "submitSuccess": "提交成功，已同步到后台。",
+      "submitSuccessToast": "菜单已提交",
+      "submitFail": "提交失败"
+    },
+    "my": {
+      "title": "我的订单",
+      "subtitle": "可查看你在当前邀请链接下提交的历史订单。",
+      "noHistory": "暂无历史记录，请先提交至少一笔订单。",
+      "loading": "订单加载中...",
+      "none": "当前还没有订单记录。",
+      "backToMenu": "返回点餐",
+      "deleteConfirm": "确认删除这条订单吗？该操作不可恢复。",
+      "deleteFail": "删除失败",
+      "status": {
+        "PENDING": "待备餐",
+        "PREPARING": "备餐中",
+        "DONE": "已完成"
+      },
+      "categoryUnknown": "未分类",
+      "note": "备注：{note}"
+    }
+  }
+}
+

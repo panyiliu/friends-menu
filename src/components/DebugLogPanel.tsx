@@ -2,6 +2,7 @@
 
 import { appendClientDebugLine, clearClientDebugLog, getClientDebugLogText } from "@/lib/client-debug-log";
 import { useCallback, useEffect, useState } from "react";
+import { useI18n } from "@/i18n";
 
 type Props = {
   /** 已登录时可拉取服务端环状日志 */
@@ -11,6 +12,7 @@ type Props = {
 };
 
 export function DebugLogPanel({ fetchServerLogs, enabled }: Props) {
+  const { t } = useI18n();
   const on = Boolean(enabled);
   const [open, setOpen] = useState(true);
   const [text, setText] = useState("");
@@ -77,10 +79,10 @@ export function DebugLogPanel({ fetchServerLogs, enabled }: Props) {
   return (
     <div className="fixed bottom-0 right-0 z-[100] max-h-[50vh] w-full max-w-lg border border-amber-700/50 bg-stone-950/95 text-left text-xs text-amber-100 shadow-lg md:bottom-4 md:right-4 md:rounded-md">
       <div className="flex items-center justify-between gap-2 border-b border-amber-800/50 px-2 py-1">
-        <span className="font-medium text-amber-200">调试日志</span>
+        <span className="font-medium text-amber-200">{t("admin.debug.title")}</span>
         <div className="flex gap-1">
           <button type="button" className="rounded bg-amber-900/80 px-2 py-0.5 text-amber-100" onClick={() => void refresh()}>
-            刷新
+            {t("common.actions.refresh")}
           </button>
           <button
             type="button"
@@ -90,10 +92,10 @@ export function DebugLogPanel({ fetchServerLogs, enabled }: Props) {
               setText("");
             }}
           >
-            清空客户端
+            {t("admin.debug.clearClient")}
           </button>
           <button type="button" className="rounded bg-stone-800 px-2 py-0.5" onClick={() => setOpen((o) => !o)}>
-            {open ? "收起" : "展开"}
+            {open ? t("common.actions.collapse") : t("common.actions.expand")}
           </button>
         </div>
       </div>
@@ -101,12 +103,12 @@ export function DebugLogPanel({ fetchServerLogs, enabled }: Props) {
         <div className="max-h-[40vh] overflow-auto p-2 font-mono leading-relaxed">
           {fetchServerLogs && serverLines.length > 0 ? (
             <>
-              <div className="mb-2 text-amber-300/90">— 服务端（近期）—</div>
+              <div className="mb-2 text-amber-300/90">{t("admin.debug.serverRecent")}</div>
               <pre className="mb-3 whitespace-pre-wrap break-all text-[10px] text-stone-300">{serverLines.join("\n")}</pre>
             </>
           ) : null}
-          <div className="mb-1 text-amber-300/90">— 客户端 —</div>
-          <pre className="whitespace-pre-wrap break-all text-[10px] text-stone-400">{text || "（无）"}</pre>
+          <div className="mb-1 text-amber-300/90">{t("admin.debug.client")}</div>
+          <pre className="whitespace-pre-wrap break-all text-[10px] text-stone-400">{text || t("admin.debug.none")}</pre>
         </div>
       ) : null}
     </div>

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useI18n } from "@/i18n";
 
 type Order = {
   id: string;
@@ -12,7 +14,8 @@ type Order = {
 };
 
 export default function GuestMyOrdersClient({ token }: { token: string }) {
-  const statusText = (status: Order["status"]) => (status === "PENDING" ? "待备餐" : status === "PREPARING" ? "备餐中" : "已完成");
+  const { t } = useI18n();
+  const statusText = (status: Order["status"]) => t(`guest.my.status.${status}`);
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [guestId, setGuestId] = useState("");
@@ -40,7 +43,7 @@ export default function GuestMyOrdersClient({ token }: { token: string }) {
 
   async function deleteOrder(orderId: string) {
     if (!guestId) return;
-    const ok = confirm("确认删除这条订单吗？该操作不可恢复。");
+    const ok = confirm(t("guest.my.deleteConfirm"));
     if (!ok) return;
     try {
       const res = await fetch("/api/guest/orders", {
@@ -50,12 +53,12 @@ export default function GuestMyOrdersClient({ token }: { token: string }) {
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || !d.ok) {
-        alert(d.message || "删除失败");
+        alert(d.message || t("guest.my.deleteFail"));
         return;
       }
       setOrders((prev) => prev.filter((o) => o.id !== orderId));
     } catch {
-      alert("删除失败");
+      alert(t("guest.my.deleteFail"));
     }
   }
 
@@ -64,19 +67,19 @@ export default function GuestMyOrdersClient({ token }: { token: string }) {
       <div className="mx-auto max-w-3xl">
         <section className="rounded-3xl border border-amber-100 bg-gradient-to-r from-orange-50 via-amber-50 to-white p-5 shadow-sm">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <h1 className="text-2xl font-black tracking-tight text-stone-800">我的订单</h1>
-            <Link
-              className="rounded-full border border-stone-200/80 bg-white/70 px-4 py-2 text-sm font-medium text-stone-700 transition hover:border-amber-300 hover:bg-white hover:shadow-sm"
-              href={`/menu/${token}`}
-            >
-              返回点餐
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-black tracking-tight text-stone-800">{t("guest.my.title")}</h1>
+              <LanguageSwitcher />
+            </div>
+            <Link className="rounded-full border border-stone-200/80 bg-white/70 px-4 py-2 text-sm font-medium text-stone-700 transition hover:border-amber-300 hover:bg-white hover:shadow-sm" href={`/menu/${token}`}>
+              {t("guest.my.backToMenu")}
             </Link>
           </div>
-          <p className="text-xs text-stone-500">可查看你在当前邀请链接下提交的历史订单。</p>
+          <p className="text-xs text-stone-500">{t("guest.my.subtitle")}</p>
         </section>
 
-        {!guestId ? <p className="mt-4 rounded-xl border border-stone-200 bg-white/70 px-4 py-3 text-sm text-stone-600">暂无历史记录，请先提交至少一笔订单。</p> : null}
-        {loading ? <p className="mt-4 rounded-xl border border-stone-200 bg-white/70 px-4 py-3 text-sm text-stone-500">订单加载中...</p> : null}
+        {!guestId ? <p className="mt-4 rounded-xl border border-stone-200 bg-white/70 px-4 py-3 text-sm text-stone-600">{t("guest.my.noHistory")}</p> : null}
+        {loading ? <p className="mt-4 rounded-xl border border-stone-200 bg-white/70 px-4 py-3 text-sm text-stone-500">{t("guest.my.loading")}</p> : null}
         <div className="mt-4 space-y-3">
         {orders.map((o) => (
           <div key={o.id} className="rounded-2xl border border-stone-100 bg-white/90 p-4 shadow-sm">
@@ -94,14 +97,14 @@ export default function GuestMyOrdersClient({ token }: { token: string }) {
                   className="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs text-stone-600 hover:bg-stone-50"
                   onClick={() => void deleteOrder(o.id)}
                 >
-                  删除
+                  {t("common.actions.delete")}
                 </button>
               </div>
             </div>
             <div className="mt-3 space-y-3 text-sm text-stone-700">
               {Object.entries(
                 o.items.reduce<Record<string, Order["items"]>>((acc, item) => {
-                  const cat = item.dish.category?.name || "未分类";
+                  const cat = item.dish.category?.name || t("guest.my.categoryUnknown");
                   if (!acc[cat]) acc[cat] = [];
                   acc[cat].push(item);
                   return acc;
@@ -119,11 +122,11 @@ export default function GuestMyOrdersClient({ token }: { token: string }) {
                 </div>
               ))}
             </div>
-            {o.note ? <p className="mt-2 text-sm text-stone-500">备注：{o.note}</p> : null}
+            {o.note ? <p className="mt-2 text-sm text-stone-500">{t("guest.my.note", { note: o.note })}</p> : null}
           </div>
         ))}
         {!loading && guestId && orders.length === 0 ? (
-          <p className="rounded-xl border border-stone-200 bg-white/70 px-4 py-3 text-sm text-stone-600">当前还没有订单记录。</p>
+          <p className="rounded-xl border border-stone-200 bg-white/70 px-4 py-3 text-sm text-stone-600">{t("guest.my.none")}</p>
         ) : null}
         </div>
       </div>

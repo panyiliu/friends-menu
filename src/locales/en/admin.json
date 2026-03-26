@@ -1,0 +1,53 @@
+{
+  "admin": {
+    "debug": {
+      "title": "Debug logs",
+      "clearClient": "Clear client",
+      "serverRecent": "— Server (recent) —",
+      "client": "— Client —",
+      "none": "(none)"
+    },
+    "login": {
+      "title": "Admin Login",
+      "checkingSession": "Checking session...",
+      "passwordPlaceholder": "Password",
+      "submitting": "Signing in...",
+      "submit": "Sign in",
+      "apiNonJson": "Login API returned non-JSON. Check server logs.",
+      "failed": "Login failed",
+      "sessionFail": "Password verified, but the browser did not send a valid session. Check: (1) reverse proxy should pass X-Forwarded-Proto; (2) do not block cookies. See docs/product-auth.md.",
+      "networkError": "Network/browser error: {msg}",
+      "diagTitle": "Login diagnostics (auto recorded)",
+      "diagEmpty": "After you submit, steps and HTTP status will appear here.",
+      "diagControlled": "Controlled by Admin Settings → Debug log panel."
+    },
+    "orders": {
+      "categoryUnknown": "Uncategorized"
+    },
+    "tabs": {
+      "menu": "Menu",
+      "orders": "Orders",
+      "settings": "Settings"
+    },
+    "actions": {
+      "logout": "Logout"
+    },
+    "session": {
+      "checking": "Checking session..."
+    },
+    "brand": {
+      "defaultTitle": "Order System",
+      "subtitle": "Kitchen console · Crafted flavors",
+      "backendVersion": "Backend: {gitSha} · {buildTime}",
+      "backendVersionLoading": "Backend: loading..."
+    },
+    "toast": {
+      "dishSaved": "Dish saved",
+      "dishDeleted": "Dish deleted"
+    },
+    "links": {
+      "unnamed": "Untitled link"
+    }
+  }
+}
+

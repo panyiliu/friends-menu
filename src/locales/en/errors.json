@@ -1,0 +1,23 @@
+{
+  "errors": {
+    "PARAM_INVALID": "Invalid parameters",
+    "INVITE_INVALID": "Invalid link",
+    "INVITE_INVALID_OR_EXPIRED": "Invalid or expired link",
+    "DISH_UNAVAILABLE": "Some dishes are unavailable. Refresh and try again.",
+    "ORDER_NOT_FOUND_OR_FORBIDDEN": "Order not found or not allowed",
+    "RATE_LIMITED": "Too many attempts. Try again later.",
+    "INVALID_CREDENTIALS": "Invalid username or password",
+    "DEFAULT_PASSWORD_BLOCKED": "Default password is blocked in production. Please change the admin password first.",
+    "ADMIN_LOGIN_FAILED": "Admin login failed",
+    "INVITE_NOT_FOUND": "Link not found",
+    "INVITE_CANNOT_DELETE_ACTIVE": "Active link cannot be deleted",
+    "INVITE_NO_ACTIVE": "No active link to update",
+    "ADMIN_INVITE_GET_FAILED": "Failed to load invite links. Check server logs.",
+    "ADMIN_INVITE_POST_FAILED": "Failed to create/update invite links. Check server logs.",
+    "UPLOAD_FAILED": "Upload failed",
+    "SAVE_FAILED": "Save failed",
+    "DELETE_FAILED": "Delete failed",
+    "UNKNOWN": "Something went wrong. Please try again."
+  }
+}
+

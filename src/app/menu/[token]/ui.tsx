@@ -3,6 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useI18n } from "@/i18n";
 
 type Dish = { id: string; name: string; englishName?: string; tags?: string; description: string; price: number; isAvailable: boolean; images: { url: string }[] };
 type Category = { id: string; name: string; dishes: Dish[] };
@@ -26,6 +28,7 @@ type UiConfig = {
 };
 
 export default function GuestMenuClient({ token }: { token: string }) {
+  const { t } = useI18n();
   const [categories, setCategories] = useState<Category[]>([]);
   const [showPrice, setShowPrice] = useState(false);
   const [cart, setCart] = useState<Cart>({});
@@ -74,9 +77,9 @@ export default function GuestMenuClient({ token }: { token: string }) {
             setShowWelcome(Boolean(d.welcomeTemplate?.enabled));
           }
           setError("");
-        } else setError(d.message || "链接无效");
+        } else setError(d.message || t("guest.menu.linkInvalid"));
       })
-      .catch(() => setError("菜单加载失败，请稍后重试"))
+      .catch(() => setError(t("guest.menu.menuLoadFailed")))
       .finally(() => setLoadingMenu(false));
   }, [token]);
 
@@ -145,7 +148,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
       : welcomeTemplate?.textAlign === "right"
         ? "text-right"
         : "text-center";
-  const resolvedGuestName = (inviteGuestName || "朋友").trim() || "朋友";
+  const resolvedGuestName = (inviteGuestName || t("guest.menu.defaultGuestName")).trim() || t("guest.menu.defaultGuestName");
   const withFriendName = (text: string) => String(text || "").replace(/\{\{\s*friendName\s*\}\}/gi, resolvedGuestName);
 
   const add = (id: string) => {
@@ -195,8 +198,8 @@ export default function GuestMenuClient({ token }: { token: string }) {
 
   async function submit() {
     if (totalCount === 0) {
-      setMessage("请先添加至少一道菜");
-      showToast("菜单还是空的，请先添加菜品", 1200);
+      setMessage(t("guest.menu.needAtLeastOne"));
+      showToast(t("guest.menu.cartEmptyToast"), 1200);
       return;
     }
     setLoading(true);
@@ -216,11 +219,11 @@ export default function GuestMenuClient({ token }: { token: string }) {
       setNote("");
       setEta("");
       setShowCart(false);
-      setMessage("提交成功，已同步到后台。");
-      showToast("🎉 菜单已提交", 2200);
+      setMessage(t("guest.menu.submitSuccess"));
+      showToast(t("guest.menu.submitSuccessToast"), 2200);
     } else {
-      setMessage(data.message || "提交失败");
-      showToast(data.message || "提交失败", 1600);
+      setMessage(data.message || t("guest.menu.submitFail"));
+      showToast(data.message || t("guest.menu.submitFail"), 1600);
     }
     setLoading(false);
   }
@@ -240,9 +243,12 @@ export default function GuestMenuClient({ token }: { token: string }) {
   if (error) {
     return (
       <main className="mx-auto max-w-lg p-5">
-        <h1 className="text-lg font-bold">链接不可用</h1>
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-lg font-bold">{t("guest.menu.linkUnavailableTitle")}</h1>
+          <LanguageSwitcher />
+        </div>
         <p className="mt-2 text-sm text-gray-600">{error}</p>
-        <p className="mt-2 text-sm text-gray-600">请联系管理员重新分享点餐链接。</p>
+        <p className="mt-2 text-sm text-gray-600">{t("guest.menu.linkUnavailableTip1")}</p>
       </main>
     );
   }
@@ -250,7 +256,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
   if (loadingMenu) {
     return (
       <main className="premiumMenuRoot antialiased">
-        <div className="mx-auto max-w-7xl px-4 py-8 text-sm text-stone-500">菜单加载中...</div>
+        <div className="mx-auto max-w-7xl px-4 py-8 text-sm text-stone-500">{t("guest.menu.menuLoading")}</div>
       </main>
     );
   }
@@ -397,8 +403,9 @@ export default function GuestMenuClient({ token }: { token: string }) {
               href={`/menu/${token}/my`}
               className="group shrink-0 rounded-full border border-stone-200/80 bg-white/70 px-3 py-1.5 text-sm font-medium text-stone-600 backdrop-blur-sm transition-all duration-300 hover:border-amber-300 hover:bg-white hover:shadow-md sm:px-4 sm:py-2"
             >
-              <span>我的订单</span>
+              <span>{t("guest.menu.myOrders")}</span>
             </Link>
+            <LanguageSwitcher className="ml-2" />
           </div>
         </div>
 
@@ -458,7 +465,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
                           disabled={!dish.isAvailable}
                           onClick={() => add(dish.id)}
                         >
-                          {dish.isAvailable ? (qty > 0 ? `已选 ${qty}` : "加入") : "售罄"}
+                          {dish.isAvailable ? (qty > 0 ? t("guest.menu.selected", { qty }) : t("guest.menu.add")) : t("guest.menu.soldOut")}
                         </button>
                       </div>
                     </div>
@@ -498,7 +505,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
       >
         <div className={`cart-drawer-panel fixed right-0 top-0 flex h-full w-full max-w-md flex-col overflow-hidden rounded-l-3xl border-l border-amber-100/80 bg-white/98 shadow-2xl ${showCart ? "translate-x-0" : "translate-x-full"}`}>
           <div className="flex items-center justify-between border-b border-amber-100/60 bg-gradient-to-r from-orange-50/80 to-amber-50/80 p-6">
-            <h3 className="flex items-center gap-2 text-xl font-bold text-stone-800">点餐清单</h3>
+            <h3 className="flex items-center gap-2 text-xl font-bold text-stone-800">{t("guest.menu.cartTitle")}</h3>
             <button className="flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-stone-500 shadow-sm transition hover:bg-stone-100" onClick={() => setShowCart(false)}>
               ×
             </button>
@@ -507,7 +514,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
           <div className="flex-1 space-y-3 overflow-y-auto p-5">
             {cartItems.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-14 text-center text-stone-400">
-                <p className="text-sm">菜单空置 · 选几道挚爱吧</p>
+                <p className="text-sm">{t("guest.menu.cartEmptyHint")}</p>
               </div>
             ) : null}
             {cartItems.map((item) => (
@@ -549,8 +556,8 @@ export default function GuestMenuClient({ token }: { token: string }) {
               {inviteGuestName ? (
                 <div className="premium-input w-full px-4 py-3 text-sm font-medium text-stone-700">点餐人：{resolvedGuestName}</div>
               ) : null}
-              <input type="text" placeholder="预计到访时间 (例如 19:00)" className="premium-input w-full px-4 py-3 text-sm" value={eta} onChange={(e) => setEta(e.target.value)} />
-              <textarea rows={2} placeholder="特殊要求 / 忌口 / 加辣" className="premium-input w-full resize-none px-4 py-3 text-sm" value={note} onChange={(e) => setNote(e.target.value)} />
+              <input type="text" placeholder={t("guest.menu.etaPlaceholder")} className="premium-input w-full px-4 py-3 text-sm" value={eta} onChange={(e) => setEta(e.target.value)} />
+              <textarea rows={2} placeholder={t("guest.menu.notePlaceholder")} className="premium-input w-full resize-none px-4 py-3 text-sm" value={note} onChange={(e) => setNote(e.target.value)} />
               <button
                 className="group mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-stone-800 to-stone-900 py-3.5 font-semibold text-white shadow-md transition-all duration-300 hover:shadow-xl disabled:opacity-60"
                 disabled={loading}
@@ -560,7 +567,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
               </button>
               {cartItems.length > 0 ? (
                 <button className="w-full rounded-2xl border border-zinc-200 bg-white py-3 text-sm text-zinc-700 hover:bg-zinc-50" onClick={clearAll}>
-                  清空菜单
+                  {t("guest.menu.clearCart")}
                 </button>
               ) : null}
             </div>

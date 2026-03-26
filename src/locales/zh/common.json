@@ -1,0 +1,20 @@
+{
+  "common": {
+    "lang": {
+      "zh": "中文",
+      "en": "English"
+    },
+    "actions": {
+      "save": "保存",
+      "cancel": "取消",
+      "confirm": "确认",
+      "delete": "删除",
+      "refresh": "刷新",
+      "clear": "清空",
+      "expand": "展开",
+      "collapse": "收起",
+      "back": "返回"
+    }
+  }
+}
+

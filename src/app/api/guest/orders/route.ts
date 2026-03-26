@@ -15,19 +15,19 @@ const schema = z.object({
 export async function POST(req: Request) {
   const parsed = schema.safeParse(await req.json());
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, message: "参数错误" }, { status: 400 });
+    return NextResponse.json({ ok: false, code: "PARAM_INVALID", message: "参数错误" }, { status: 400 });
   }
   const { token, guestId, guestName, note, eta, items } = parsed.data;
   const invite = await prisma.inviteLink.findUnique({ where: { token } });
   const now = new Date();
   if (!invite || !invite.isActive || (invite.expiresAt && invite.expiresAt < now)) {
-    return NextResponse.json({ ok: false, message: "链接无效或已过期" }, { status: 403 });
+    return NextResponse.json({ ok: false, code: "INVITE_INVALID_OR_EXPIRED", message: "链接无效或已过期" }, { status: 403 });
   }
 
   const dishIds = items.map((i) => i.dishId);
   const dishes = await prisma.dish.findMany({ where: { id: { in: dishIds }, isAvailable: true, isPublished: true } });
   if (dishes.length !== dishIds.length) {
-    return NextResponse.json({ ok: false, message: "存在不可点菜品，请刷新后重试" }, { status: 400 });
+    return NextResponse.json({ ok: false, code: "DISH_UNAVAILABLE", message: "存在不可点菜品，请刷新后重试" }, { status: 400 });
   }
 
   const resolvedGuestName = String(invite.inviteGuestName || guestName || invite.label || "朋友").trim().slice(0, 20) || "朋友";
@@ -72,16 +72,16 @@ const deleteSchema = z.object({
 export async function DELETE(req: Request) {
   const parsed = deleteSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ ok: false, message: "参数错误" }, { status: 400 });
+    return NextResponse.json({ ok: false, code: "PARAM_INVALID", message: "参数错误" }, { status: 400 });
   }
   const { token, guestId, orderId } = parsed.data;
 
   const invite = await prisma.inviteLink.findUnique({ where: { token } });
-  if (!invite) return NextResponse.json({ ok: false, message: "链接无效" }, { status: 403 });
+  if (!invite) return NextResponse.json({ ok: false, code: "INVITE_INVALID", message: "链接无效" }, { status: 403 });
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order || order.inviteId !== invite.id || order.guestId !== guestId) {
-    return NextResponse.json({ ok: false, message: "订单不存在或无权限" }, { status: 404 });
+    return NextResponse.json({ ok: false, code: "ORDER_NOT_FOUND_OR_FORBIDDEN", message: "订单不存在或无权限" }, { status: 404 });
   }
 
   await prisma.order.delete({ where: { id: orderId } });
