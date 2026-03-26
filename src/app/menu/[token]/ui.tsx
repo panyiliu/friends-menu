@@ -7,7 +7,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useI18n } from "@/i18n";
 
 type Dish = { id: string; name: string; englishName?: string; tags?: string; description: string; price: number; isAvailable: boolean; images: { url: string }[] };
-type Category = { id: string; name: string; dishes: Dish[] };
+type Category = { id: string; name: string; englishName?: string; dishes: Dish[] };
 type Cart = Record<string, number>;
 type WelcomeTemplate = {
   enabled: boolean;
@@ -173,19 +173,11 @@ export default function GuestMenuClient({ token }: { token: string }) {
         : "text-center";
   const resolvedGuestName = (inviteGuestName || t("guest.menu.defaultGuestName")).trim() || t("guest.menu.defaultGuestName");
   const withFriendName = (text: string) => String(text || "").replace(/\{\{\s*friendName\s*\}\}/gi, resolvedGuestName);
-  const categoryNameMapEn: Record<string, string> = {
-    热菜: "Hot Dishes",
-    凉菜: "Cold Dishes",
-    汤品: "Soups",
-    小食: "Snacks",
-    西餐: "Western",
-    中餐: "Chinese",
-    饮品: "Drinks",
-    甜品: "Desserts",
-    主食: "Staples",
-    未分类: "Uncategorized",
+  const displayCategoryName = (c: Category) => {
+    if (lang !== "en") return c.name;
+    const en = String(c.englishName || "").trim();
+    return en || c.name;
   };
-  const displayCategoryName = (name: string) => (lang === "en" ? (categoryNameMapEn[name] || name) : name);
 
   const add = (id: string) => {
     setCart((c) => ({ ...c, [id]: (c[id] || 0) + 1 }));
@@ -456,7 +448,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
                   className={`category-btn whitespace-nowrap px-5 py-2 text-sm font-medium transition-all ${currentCategoryId === c.id ? "active" : "text-stone-600"}`}
                   onClick={() => jumpToCategory(c.id)}
                 >
-                  {displayCategoryName(c.name)}
+                  {displayCategoryName(c)}
                 </button>
               ))}
             </div>
@@ -475,7 +467,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
             >
               <div className="mb-4 flex items-center gap-2 px-1">
                 <div className="h-6 w-1.5 rounded-full bg-orange-400" />
-                <h2 className="text-xl font-semibold tracking-tight text-stone-800">{displayCategoryName(cat.name)}</h2>
+                <h2 className="text-xl font-semibold tracking-tight text-stone-800">{displayCategoryName(cat)}</h2>
                 <span className="rounded-full bg-stone-100/70 px-2 py-0.5 text-xs font-medium text-stone-400">{cat.dishes.length}</span>
               </div>
 
@@ -531,7 +523,12 @@ export default function GuestMenuClient({ token }: { token: string }) {
             {hydrated ? totalCount : 0}
           </span>
           <span className="absolute inset-0 rounded-full bg-white/20 opacity-0 blur-sm transition-opacity duration-300 group-hover:opacity-100" />
-          <span className="relative font-bold">{t("guest.menu.cartBagLabel")}</span>
+          <span className="relative inline-flex h-5 w-5 items-center justify-center">
+            <svg viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current stroke-[1.8]" aria-hidden>
+              <path d="M3 6h19l-1.8 12.2a2 2 0 0 1-2 1.8H7.8a2 2 0 0 1-2-1.7L4 7.2" />
+              <path d="M8.5 9.5V7a3.5 3.5 0 1 1 7 0v2.5" />
+            </svg>
+          </span>
         </button>
       </div>
 

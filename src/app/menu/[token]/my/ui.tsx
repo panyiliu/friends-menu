@@ -9,25 +9,18 @@ type Order = {
   createdAt: string;
   note: string;
   status: "PENDING" | "PREPARING" | "DONE";
-  items: { id: string; quantity: number; dish: { name: string; category?: { name: string } | null } }[];
+  items: { id: string; quantity: number; dish: { name: string; category?: { name: string; englishName?: string } | null } }[];
 };
 
 export default function GuestMyOrdersClient({ token }: { token: string }) {
   const { t, lang } = useI18n();
   const statusText = (status: Order["status"]) => t(`guest.my.status.${status}`);
-  const categoryNameMapEn: Record<string, string> = {
-    热菜: "Hot Dishes",
-    凉菜: "Cold Dishes",
-    汤品: "Soups",
-    小食: "Snacks",
-    西餐: "Western",
-    中餐: "Chinese",
-    饮品: "Drinks",
-    甜品: "Desserts",
-    主食: "Staples",
-    未分类: "Uncategorized",
+  const displayCategoryName = (cat?: { name: string; englishName?: string } | null) => {
+    if (!cat) return t("guest.my.categoryUnknown");
+    if (lang !== "en") return cat.name;
+    const en = String(cat.englishName || "").trim();
+    return en || cat.name;
   };
-  const displayCategoryName = (name: string) => (lang === "en" ? (categoryNameMapEn[name] || name) : name);
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [guestId, setGuestId] = useState("");
@@ -113,14 +106,14 @@ export default function GuestMyOrdersClient({ token }: { token: string }) {
             <div className="mt-3 space-y-3 text-sm text-stone-700">
               {Object.entries(
                 o.items.reduce<Record<string, Order["items"]>>((acc, item) => {
-                  const cat = item.dish.category?.name || t("guest.my.categoryUnknown");
+                  const cat = displayCategoryName(item.dish.category);
                   if (!acc[cat]) acc[cat] = [];
                   acc[cat].push(item);
                   return acc;
                 }, {}),
               ).map(([catName, items]) => (
                 <div key={catName} className="rounded-2xl border border-amber-100/70 bg-amber-50/40 p-3">
-                  <p className="text-xs font-semibold text-amber-800">{displayCategoryName(catName)}</p>
+                  <p className="text-xs font-semibold text-amber-800">{catName}</p>
                   <ul className="mt-2 space-y-1">
                     {items.map((i) => (
                       <li key={i.id}>

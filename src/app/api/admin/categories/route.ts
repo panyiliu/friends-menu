@@ -12,7 +12,12 @@ export async function POST(req: NextRequest) {
   if (!ensureAdmin(req)) return NextResponse.json({ ok: false }, { status: 401 });
   const body = await req.json();
   const data = await prisma.category.create({
-    data: { name: body.name, sortOrder: Number(body.sortOrder || 0), isEnabled: true },
+    data: {
+      name: String(body.name || ""),
+      englishName: String(body.englishName || ""),
+      sortOrder: Number(body.sortOrder || 0),
+      isEnabled: true,
+    },
   });
   return NextResponse.json({ ok: true, data });
 }
@@ -34,7 +39,12 @@ export async function PUT(req: NextRequest) {
   }
   const data = await prisma.category.update({
     where: { id: body.id },
-    data: { name: body.name, sortOrder: Number(body.sortOrder || 0), isEnabled: Boolean(body.isEnabled) },
+    data: {
+      name: String(body.name || ""),
+      englishName: String(body.englishName || ""),
+      sortOrder: Number(body.sortOrder || 0),
+      isEnabled: Boolean(body.isEnabled),
+    },
   });
   return NextResponse.json({ ok: true, data });
 }

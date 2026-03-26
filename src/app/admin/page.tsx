@@ -6,7 +6,7 @@ import { useI18n } from "@/i18n";
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-type Category = { id: string; name: string; sortOrder: number; isEnabled: boolean };
+type Category = { id: string; name: string; englishName?: string; sortOrder: number; isEnabled: boolean };
 type DishImage = { id: string; url: string };
 type Dish = {
   id: string;
@@ -68,7 +68,7 @@ type Order = {
   items: {
     id: string;
     quantity: number;
-    dish: { name: string; method: string; ingredients: string; seasonings: string; category?: { name: string } | null };
+    dish: { name: string; method: string; ingredients: string; seasonings: string; category?: { name: string; englishName?: string } | null };
   }[];
 };
 type AdminUser = {
@@ -93,7 +93,7 @@ const defaultWelcomeTemplate: WelcomeTemplate = {
 };
 
 export default function AdminPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [tab, setTab] = useState<(typeof tabs)[number]>("menu");
   const [categories, setCategories] = useState<Category[]>([]);
   const [dishes, setDishes] = useState<Dish[]>([]);
@@ -149,6 +149,8 @@ export default function AdminPage() {
   const drawerFileInputRef = useRef<HTMLInputElement | null>(null);
   const restoreZipInputRef = useRef<HTMLInputElement | null>(null);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryEnglishName, setNewCategoryEnglishName] = useState("");
+  const [categoryEnglishDrafts, setCategoryEnglishDrafts] = useState<Record<string, string>>({});
   const [isSavingDish, setIsSavingDish] = useState(false);
   const [isDeletingDish, setIsDeletingDish] = useState(false);
   const [isCreatingInvite, setIsCreatingInvite] = useState(false);
@@ -175,6 +177,12 @@ export default function AdminPage() {
     }
     return set;
   }, [dishes]);
+  const displayCategoryName = useCallback((c?: { name: string; englishName?: string } | null) => {
+    if (!c) return t("admin.orders.categoryUnknown");
+    if (lang !== "en") return c.name;
+    const en = String(c.englishName || "").trim();
+    return en || c.name;
+  }, [lang, t]);
 
   function inviteListDisplayName(inv: Invite) {
     const g = (inv.inviteGuestName || "").trim();
@@ -463,15 +471,39 @@ export default function AdminPage() {
     const res = await fetch("/api/admin/categories", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newCategoryName.trim(), sortOrder: maxSort + 1 }),
+      body: JSON.stringify({ name: newCategoryName.trim(), englishName: newCategoryEnglishName.trim(), sortOrder: maxSort + 1 }),
     });
     const d = await res.json();
     if (d.ok) {
       setNewCategoryName("");
+      setNewCategoryEnglishName("");
       setMessage("分类已新增");
       await refresh(false);
     } else {
       setMessage(d.message || "新增分类失败");
+    }
+  }
+
+  async function saveCategoryEnglishName(id: string, englishName: string) {
+    const target = categories.find((c) => c.id === id);
+    if (!target) return;
+    const res = await fetch("/api/admin/categories", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: target.id,
+        name: target.name,
+        englishName: englishName.trim(),
+        sortOrder: target.sortOrder,
+        isEnabled: target.isEnabled,
+      }),
+    });
+    const d = await res.json();
+    if (d.ok) {
+      setMessage("分类英文名已保存");
+      await refresh(false);
+    } else {
+      setMessage(d.message || "保存失败");
     }
   }
 
@@ -897,6 +929,10 @@ export default function AdminPage() {
     }
   }
 
+  useEffect(() => {
+    setCategoryEnglishDrafts(Object.fromEntries(categories.map((c) => [c.id, String(c.englishName || "")])));
+  }, [categories]);
+
   if (!authedChecked) {
     return (
       <main className="min-h-screen bg-zinc-50">
@@ -970,7 +1006,7 @@ export default function AdminPage() {
                 <option value="">全部分类</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name}
+                    {displayCategoryName(c)}
                   </option>
                 ))}
               </select>
@@ -1027,7 +1063,7 @@ export default function AdminPage() {
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <div className="h-6 w-1.5 rounded-full bg-orange-400" />
-                        <h2 className="text-xl font-bold text-stone-800">{c.name}</h2>
+                        <h2 className="text-xl font-bold text-stone-800">{displayCategoryName(c)}</h2>
                         <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-500">{list.length} 道</span>
                       </div>
                       <button
@@ -1113,7 +1149,7 @@ export default function AdminPage() {
                   <select className="rounded-xl border border-zinc-200 px-2 py-1" value={selectedDish.categoryId} onChange={(e) => setSelectedDish({ ...selectedDish, categoryId: e.target.value })}>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name}
+                        {displayCategoryName(c)}
                       </option>
                     ))}
                   </select>
@@ -1274,7 +1310,7 @@ export default function AdminPage() {
               <div className="mt-2 space-y-3 text-sm">
                 {Object.entries(
                   o.items.reduce<Record<string, typeof o.items>>((acc, item) => {
-                    const cat = item.dish.category?.name || "未分类";
+                    const cat = displayCategoryName(item.dish.category);
                     if (!acc[cat]) acc[cat] = [];
                     acc[cat].push(item);
                     return acc;
@@ -1667,6 +1703,12 @@ export default function AdminPage() {
                 value={newCategoryName}
                 onChange={(e) => setNewCategoryName(e.target.value)}
               />
+              <input
+                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
+                placeholder="English name (optional)"
+                value={newCategoryEnglishName}
+                onChange={(e) => setNewCategoryEnglishName(e.target.value)}
+              />
               <button className="rounded-xl bg-zinc-900 px-3 py-2 text-sm text-white" onClick={() => void createCategoryInSettings()}>
                 新增
               </button>
@@ -1684,6 +1726,18 @@ export default function AdminPage() {
                   <div className="flex items-center gap-2">
                     <span className="cursor-move text-xs text-zinc-500">拖拽</span>
                     <span className="text-sm font-medium">{c.name}</span>
+                    <input
+                      className="w-40 rounded-lg border border-zinc-200 px-2 py-1 text-xs"
+                      placeholder="English name"
+                      value={categoryEnglishDrafts[c.id] ?? ""}
+                      onChange={(e) => setCategoryEnglishDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                    />
+                    <button
+                      className="rounded-lg border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50"
+                      onClick={() => void saveCategoryEnglishName(c.id, categoryEnglishDrafts[c.id] ?? "")}
+                    >
+                      保存英文名
+                    </button>
                   </div>
                   <div className="flex items-center gap-2">
                     <button

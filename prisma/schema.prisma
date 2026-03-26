@@ -24,6 +24,7 @@ model AdminUser {
 model Category {
   id        String   @id @default(cuid())
   name      String
+  englishName String @default("")
   sortOrder Int      @default(0)
   isEnabled Boolean  @default(true)
   dishes    Dish[]
