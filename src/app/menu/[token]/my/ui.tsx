@@ -8,7 +8,7 @@ type Order = {
   createdAt: string;
   note: string;
   status: "PENDING" | "PREPARING" | "DONE";
-  items: { id: string; quantity: number; dish: { name: string } }[];
+  items: { id: string; quantity: number; dish: { name: string; category?: { name: string } | null } }[];
 };
 
 export default function GuestMyOrdersClient({ token }: { token: string }) {
@@ -38,6 +38,27 @@ export default function GuestMyOrdersClient({ token }: { token: string }) {
       .finally(() => setLoading(false));
   }, [token, guestId]);
 
+  async function deleteOrder(orderId: string) {
+    if (!guestId) return;
+    const ok = confirm("确认删除这条订单吗？该操作不可恢复。");
+    if (!ok) return;
+    try {
+      const res = await fetch("/api/guest/orders", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, guestId, orderId }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.ok) {
+        alert(d.message || "删除失败");
+        return;
+      }
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    } catch {
+      alert("删除失败");
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_15%_30%,_rgba(255,235,205,0.5)_0%,_#fff8f0_70%,_#fff_100%)] px-4 py-6">
       <div className="mx-auto max-w-3xl">
@@ -61,21 +82,43 @@ export default function GuestMyOrdersClient({ token }: { token: string }) {
           <div key={o.id} className="rounded-2xl border border-stone-100 bg-white/90 p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <p className="font-medium text-stone-800">{new Date(o.createdAt).toLocaleString()}</p>
-              <p
-                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                  o.status === "DONE" ? "bg-emerald-100 text-emerald-700" : o.status === "PREPARING" ? "bg-amber-100 text-amber-700" : "bg-stone-100 text-stone-600"
-                }`}
-              >
-                {statusText(o.status)}
-              </p>
+              <div className="flex items-center gap-2">
+                <p
+                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    o.status === "DONE" ? "bg-emerald-100 text-emerald-700" : o.status === "PREPARING" ? "bg-amber-100 text-amber-700" : "bg-stone-100 text-stone-600"
+                  }`}
+                >
+                  {statusText(o.status)}
+                </p>
+                <button
+                  className="rounded-full border border-stone-200 bg-white px-3 py-1 text-xs text-stone-600 hover:bg-stone-50"
+                  onClick={() => void deleteOrder(o.id)}
+                >
+                  删除
+                </button>
+              </div>
             </div>
-            <ul className="mt-3 space-y-1 text-sm text-stone-700">
-              {o.items.map((i) => (
-                <li key={i.id}>
-                  {i.dish.name} x{i.quantity}
-                </li>
+            <div className="mt-3 space-y-3 text-sm text-stone-700">
+              {Object.entries(
+                o.items.reduce<Record<string, Order["items"]>>((acc, item) => {
+                  const cat = item.dish.category?.name || "未分类";
+                  if (!acc[cat]) acc[cat] = [];
+                  acc[cat].push(item);
+                  return acc;
+                }, {}),
+              ).map(([catName, items]) => (
+                <div key={catName} className="rounded-2xl border border-amber-100/70 bg-amber-50/40 p-3">
+                  <p className="text-xs font-semibold text-amber-800">{catName}</p>
+                  <ul className="mt-2 space-y-1">
+                    {items.map((i) => (
+                      <li key={i.id}>
+                        {i.dish.name} x{i.quantity}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ))}
-            </ul>
+            </div>
             {o.note ? <p className="mt-2 text-sm text-stone-500">备注：{o.note}</p> : null}
           </div>
         ))}

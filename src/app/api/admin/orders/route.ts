@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         createdAt: from || to ? { gte: from ? new Date(from) : undefined, lte: to ? new Date(to) : undefined } : undefined,
         status: status as "PENDING" | "PREPARING" | "DONE" | undefined,
       },
-      include: { guest: true, items: { include: { dish: { include: { images: true } } } } },
+      include: { guest: true, items: { include: { dish: { include: { images: true, category: true } } } } },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json({ ok: true, data });
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
           createdAt: from || to ? { gte: from ? new Date(from) : undefined, lte: to ? new Date(to) : undefined } : undefined,
           status: status as "PENDING" | "PREPARING" | "DONE" | undefined,
         },
-        include: { guest: true, items: { include: { dish: { include: { images: true } } } } },
+        include: { guest: true, items: { include: { dish: { include: { images: true, category: true } } } } },
         orderBy: { createdAt: "desc" },
       });
       return NextResponse.json({ ok: true, data });

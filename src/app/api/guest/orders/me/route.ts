@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const orders = await prisma.order.findMany({
     where: { guestId, inviteId: invite.id },
     orderBy: { createdAt: "desc" },
-    include: { items: { include: { dish: true } } },
+    include: { items: { include: { dish: { include: { category: true } } } } },
   });
 
   return NextResponse.json({ ok: true, orders });

@@ -63,7 +63,11 @@ type Order = {
   status: "PENDING" | "PREPARING" | "DONE";
   note: string;
   guest: { name: string };
-  items: { id: string; quantity: number; dish: { name: string; method: string; ingredients: string; seasonings: string } }[];
+  items: {
+    id: string;
+    quantity: number;
+    dish: { name: string; method: string; ingredients: string; seasonings: string; category?: { name: string } | null };
+  }[];
 };
 type AdminUser = {
   id: string;
@@ -108,6 +112,9 @@ export default function AdminPage() {
   const [newInviteGuestName, setNewInviteGuestName] = useState("");
   const [newInviteShowPrice, setNewInviteShowPrice] = useState(false);
   const [newInviteTemplate, setNewInviteTemplate] = useState<WelcomeTemplate>(defaultWelcomeTemplate);
+  const [newInviteExpiryPresetDays, setNewInviteExpiryPresetDays] = useState("3");
+  const [newInviteExpiresAt, setNewInviteExpiresAt] = useState("");
+  const [inviteExpiryDrafts, setInviteExpiryDrafts] = useState<Record<string, string>>({});
   const [settings, setSettings] = useState<Settings>({
     debugUiEnabled: false,
     adminTitle: "点餐系统",
@@ -188,6 +195,18 @@ export default function AdminPage() {
       return { ok: false };
     }
   };
+
+  function toLocalDatetimeValue(d: Date) {
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    return local;
+  }
+
+  function applyDaysToDatetimeValue(days: number) {
+    if (days <= 0) return "";
+    const now = new Date();
+    now.setDate(now.getDate() + days);
+    return toLocalDatetimeValue(now);
+  }
 
   async function ensureAuthedOrRedirect() {
     // 避免瀏覽器/框架快取導致 session 檢測結果不一致
@@ -608,11 +627,23 @@ export default function AdminPage() {
       return;
     }
     setIsCreatingInvite(true);
-    const expiresAt = inviteExpiresAt ? new Date(inviteExpiresAt).toISOString() : null;
+    const effectiveExpiresAt = newInviteExpiresAt
+      ? new Date(newInviteExpiresAt).toISOString()
+      : applyDaysToDatetimeValue(Number(newInviteExpiryPresetDays || "3"))
+        ? new Date(applyDaysToDatetimeValue(Number(newInviteExpiryPresetDays || "3"))).toISOString()
+        : null;
     const res = await fetch("/api/admin/invite", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "create", label: newInviteLabel, inviteGuestName: newInviteGuestName, expiresAt, isActive: true, showPrice: newInviteShowPrice, ...newInviteTemplate }),
+      body: JSON.stringify({
+        mode: "create",
+        label: newInviteLabel,
+        inviteGuestName: newInviteGuestName,
+        expiresAt: effectiveExpiresAt,
+        isActive: true,
+        showPrice: newInviteShowPrice,
+        ...newInviteTemplate,
+      }),
     });
     const d = await safeJson(res);
     if (d.ok) {
@@ -621,11 +652,29 @@ export default function AdminPage() {
       setNewInviteGuestName("");
       setNewInviteShowPrice(false);
       setNewInviteTemplate({ ...defaultWelcomeTemplate });
+      setNewInviteExpiryPresetDays("3");
+      setNewInviteExpiresAt("");
       await refresh(false);
     } else {
       setMessage(d.message || "创建失败");
     }
     setIsCreatingInvite(false);
+  }
+
+  async function saveInviteExpiryFor(id: string, expiresAtLocal: string) {
+    const expiresAt = expiresAtLocal ? new Date(expiresAtLocal).toISOString() : null;
+    const res = await fetch("/api/admin/invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "update", id, expiresAt }),
+    });
+    const d = await res.json();
+    if (d.ok) {
+      setMessage("有效期已保存");
+      await refresh(false);
+    } else {
+      setMessage(d.message || "保存失败");
+    }
   }
 
   async function setActiveInvite(id: string) {
@@ -1217,13 +1266,27 @@ export default function AdminPage() {
                 </select>
               </div>
               <p className="mt-1 text-sm text-gray-700">当前状态：{statusText(o.status)}</p>
-              <ul className="mt-2 text-sm">
-                {o.items.map((i) => (
-                  <li key={i.id}>
-                    {i.dish.name} x{i.quantity} | 做法:{i.dish.method || "-"} | 食材:{i.dish.ingredients || "-"} | 调料:{i.dish.seasonings || "-"}
-                  </li>
+              <div className="mt-2 space-y-3 text-sm">
+                {Object.entries(
+                  o.items.reduce<Record<string, typeof o.items>>((acc, item) => {
+                    const cat = item.dish.category?.name || "未分类";
+                    if (!acc[cat]) acc[cat] = [];
+                    acc[cat].push(item);
+                    return acc;
+                  }, {}),
+                ).map(([catName, items]) => (
+                  <div key={catName} className="rounded-xl border border-zinc-200 bg-zinc-50 p-2">
+                    <p className="text-xs font-semibold text-zinc-700">{catName}</p>
+                    <ul className="mt-1 space-y-1">
+                      {items.map((i) => (
+                        <li key={i.id}>
+                          {i.dish.name} x{i.quantity} | 做法:{i.dish.method || "-"} | 食材:{i.dish.ingredients || "-"} | 调料:{i.dish.seasonings || "-"}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))}
-              </ul>
+              </div>
               {o.note ? <p className="mt-1 text-sm text-gray-600">备注：{o.note}</p> : null}
             </div>
           ))}
@@ -1265,6 +1328,46 @@ export default function AdminPage() {
                   <input type="checkbox" checked={newInviteShowPrice} onChange={(e) => setNewInviteShowPrice(e.target.checked)} />
                   该链接对外展示价格
                 </label>
+                <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-2">
+                  <p className="text-xs font-medium text-zinc-700">链接有效期（默认 3 天，可修改）</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-zinc-500">快捷：</span>
+                    <select
+                      className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs"
+                      value={newInviteExpiryPresetDays}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setNewInviteExpiryPresetDays(v);
+                        setNewInviteExpiresAt(applyDaysToDatetimeValue(Number(v)));
+                      }}
+                    >
+                      <option value="1">1天</option>
+                      <option value="3">3天（默认）</option>
+                      <option value="7">7天</option>
+                      <option value="0">自定义/永久</option>
+                    </select>
+                    <input
+                      className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs"
+                      type="datetime-local"
+                      value={newInviteExpiresAt}
+                      onChange={(e) => {
+                        setNewInviteExpiryPresetDays("0");
+                        setNewInviteExpiresAt(e.target.value);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-xs text-zinc-600 hover:bg-zinc-100"
+                      onClick={() => {
+                        setNewInviteExpiryPresetDays("0");
+                        setNewInviteExpiresAt("");
+                      }}
+                    >
+                      设为永久
+                    </button>
+                  </div>
+                  <p className="mt-1 text-[11px] text-zinc-500">为空表示永久有效；到期后访客端会提示链接过期。</p>
+                </div>
                 <details className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-2">
                   <summary className="cursor-pointer text-sm font-medium text-zinc-700">欢迎模板配置</summary>
                   <div className="mt-2 space-y-2">
@@ -1333,6 +1436,7 @@ export default function AdminPage() {
                   {inviteLinks.map((x) => {
                     const link = `${globalThis.location?.origin || ""}/menu/${x.token}`;
                     const isMain = invite?.id === x.id;
+                    const draft = inviteExpiryDrafts[x.id] ?? (x.expiresAt ? toLocalDatetimeValue(new Date(x.expiresAt)) : "");
                     return (
                       <div key={x.id} className="rounded-lg border border-zinc-200 p-2 text-xs">
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1342,6 +1446,55 @@ export default function AdminPage() {
                           <span className="text-zinc-500">
                             {x.isActive ? "启用" : "停用"} / {x.isExpired ? "过期" : "有效"}
                           </span>
+                        </div>
+                        <div className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2">
+                          <p className="text-[11px] text-zinc-500">
+                            有效期：{x.expiresAt ? new Date(x.expiresAt).toLocaleString() : "永久有效"}
+                          </p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <button
+                              className="rounded border px-2 py-0.5"
+                              onClick={() =>
+                                setInviteExpiryDrafts((prev) => ({ ...prev, [x.id]: applyDaysToDatetimeValue(1) }))
+                              }
+                            >
+                              1天
+                            </button>
+                            <button
+                              className="rounded border px-2 py-0.5"
+                              onClick={() =>
+                                setInviteExpiryDrafts((prev) => ({ ...prev, [x.id]: applyDaysToDatetimeValue(3) }))
+                              }
+                            >
+                              3天
+                            </button>
+                            <button
+                              className="rounded border px-2 py-0.5"
+                              onClick={() =>
+                                setInviteExpiryDrafts((prev) => ({ ...prev, [x.id]: applyDaysToDatetimeValue(7) }))
+                              }
+                            >
+                              7天
+                            </button>
+                            <input
+                              className="rounded border border-zinc-200 bg-white px-2 py-0.5"
+                              type="datetime-local"
+                              value={draft}
+                              onChange={(e) => setInviteExpiryDrafts((prev) => ({ ...prev, [x.id]: e.target.value }))}
+                            />
+                            <button
+                              className="rounded border px-2 py-0.5"
+                              onClick={() => setInviteExpiryDrafts((prev) => ({ ...prev, [x.id]: "" }))}
+                            >
+                              永久
+                            </button>
+                            <button
+                              className="rounded border px-2 py-0.5"
+                              onClick={() => void saveInviteExpiryFor(x.id, draft)}
+                            >
+                              保存有效期
+                            </button>
+                          </div>
                         </div>
                         <div className="mt-1 flex flex-wrap gap-2">
                           <button

@@ -201,11 +201,12 @@ export default function GuestMenuClient({ token }: { token: string }) {
     }
     setLoading(true);
     setMessage("");
+    const guestId = localStorage.getItem(`guest:${token}`) || "";
     const items = Object.entries(cart).filter(([, q]) => q > 0).map(([dishId, quantity]) => ({ dishId, quantity }));
     const res = await fetch("/api/guest/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, guestName: resolvedGuestName, note, eta, items }),
+      body: JSON.stringify({ token, guestId, guestName: resolvedGuestName, note, eta, items }),
     });
     const data = await res.json();
     if (data.ok) {
