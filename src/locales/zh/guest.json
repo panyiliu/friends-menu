@@ -1,5 +1,14 @@
 {
   "guest": {
+    "brand": {
+      "titleDefault": "朋友·聚",
+      "subtitleDefault": "欢聚时刻 · 臻选风味"
+    },
+    "welcome": {
+      "titleDefault": "欢迎光临",
+      "subtitleDefault": "请开始点餐",
+      "buttonDefault": "开始点餐"
+    },
     "menu": {
       "myOrders": "我的订单",
       "menuLoading": "菜单加载中...",
@@ -17,6 +26,8 @@
       "clearCart": "清空菜单",
       "etaPlaceholder": "预计到访时间 (例如 19:00)",
       "notePlaceholder": "特殊要求 / 忌口 / 加辣",
+      "previewImage": "预览图片",
+      "openCart": "打开购物车",
       "cartEmptyToast": "菜单还是空的，请先添加菜品",
       "submitSuccess": "提交成功，已同步到后台。",
       "submitSuccessToast": "菜单已提交",

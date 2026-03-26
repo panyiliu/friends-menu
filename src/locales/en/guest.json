@@ -1,5 +1,14 @@
 {
   "guest": {
+    "brand": {
+      "titleDefault": "Friends Feast",
+      "subtitleDefault": "Gather · Taste · Enjoy"
+    },
+    "welcome": {
+      "titleDefault": "Welcome",
+      "subtitleDefault": "Start ordering",
+      "buttonDefault": "Start"
+    },
     "menu": {
       "myOrders": "My Orders",
       "menuLoading": "Loading menu...",
@@ -17,6 +26,8 @@
       "clearCart": "Clear cart",
       "etaPlaceholder": "ETA (e.g. 19:00)",
       "notePlaceholder": "Notes / allergies / spicy level",
+      "previewImage": "Preview image",
+      "openCart": "Open cart",
       "cartEmptyToast": "Your cart is empty. Add at least one dish first.",
       "submitSuccess": "Submitted. Synced to the admin panel.",
       "submitSuccessToast": "Order submitted",

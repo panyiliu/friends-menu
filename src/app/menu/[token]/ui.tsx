@@ -46,8 +46,8 @@ export default function GuestMenuClient({ token }: { token: string }) {
   const [welcomeTemplate, setWelcomeTemplate] = useState<WelcomeTemplate | null>(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [uiConfig, setUiConfig] = useState<UiConfig>({
-    guestTitle: "朋友·聚",
-    guestSubtitle: "欢聚时刻 · 臻选风味",
+    guestTitle: t("guest.brand.titleDefault"),
+    guestSubtitle: t("guest.brand.subtitleDefault"),
     guestBannerUrl: "",
     welcomeAlwaysShow: false,
   });
@@ -65,8 +65,8 @@ export default function GuestMenuClient({ token }: { token: string }) {
           setInviteGuestName(String(d.inviteGuestName || ""));
           setWelcomeTemplate(d.welcomeTemplate || null);
           setUiConfig({
-            guestTitle: d.uiConfig?.guestTitle || "朋友·聚",
-            guestSubtitle: d.uiConfig?.guestSubtitle || "欢聚时刻 · 臻选风味",
+            guestTitle: d.uiConfig?.guestTitle || t("guest.brand.titleDefault"),
+            guestSubtitle: d.uiConfig?.guestSubtitle || t("guest.brand.subtitleDefault"),
             guestBannerUrl: d.uiConfig?.guestBannerUrl || "",
             welcomeAlwaysShow: Boolean(d.uiConfig?.welcomeAlwaysShow),
           });
@@ -394,10 +394,10 @@ export default function GuestMenuClient({ token }: { token: string }) {
               <div className="mb-1 flex items-center gap-2">
                 <div className="h-8 w-2 rounded-full bg-gradient-to-b from-orange-400 to-amber-500" />
                 <h1 className="bg-gradient-to-r from-stone-800 via-amber-800 to-orange-700 bg-clip-text text-3xl font-bold tracking-tight text-transparent md:text-4xl">
-                  {uiConfig.guestTitle || "朋友·聚"}
+                  {uiConfig.guestTitle || t("guest.brand.titleDefault")}
                 </h1>
               </div>
-              <p className="mt-1 flex items-center gap-2 text-sm text-stone-500">{uiConfig.guestSubtitle || "欢聚时刻 · 臻选风味"}</p>
+              <p className="mt-1 flex items-center gap-2 text-sm text-stone-500">{uiConfig.guestSubtitle || t("guest.brand.subtitleDefault")}</p>
             </div>
             <Link
               href={`/menu/${token}/my`}
@@ -450,7 +450,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
                       <button
                         className="dish-img relative mb-3 aspect-square w-full overflow-hidden rounded-2xl"
                         onClick={() => (hasImage ? setPreview({ url: dish.images[0].url, name: dish.name }) : null)}
-                        aria-label="预览图片"
+                        aria-label={t("guest.menu.previewImage")}
                       >
                         {hasImage ? <Image src={dish.images[0].url} alt={dish.name} fill sizes="50vw" className="object-cover" /> : null}
                       </button>
@@ -483,7 +483,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
         <button
           className="group relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-amber-600 text-xl text-white shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95"
           onClick={() => setShowCart(true)}
-          aria-label="打开购物车"
+          aria-label={t("guest.menu.openCart")}
         >
           <span
             className={`absolute -right-1 -top-1 flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white shadow-md ring-2 ring-white/60 ${
@@ -593,14 +593,14 @@ export default function GuestMenuClient({ token }: { token: string }) {
           style={{ backgroundColor: `rgba(0,0,0,${Math.max(0, Math.min(80, welcomeTemplate.backdropOpacity || 35)) / 100})` }}
         >
           <div className={`w-full max-w-md rounded-3xl border border-white/30 bg-white/70 p-6 shadow-2xl backdrop-blur-xl ${welcomeAlignClass}`}>
-            <h2 className={`${welcomeTitleClass} ${welcomeFontWeightClass} tracking-tight text-stone-900`}>{withFriendName(welcomeTemplate.title || "欢迎光临")}</h2>
-            <p className="mt-3 text-sm text-stone-600">{withFriendName(welcomeTemplate.subtitle || "请开始点餐")}</p>
+            <h2 className={`${welcomeTitleClass} ${welcomeFontWeightClass} tracking-tight text-stone-900`}>{withFriendName(welcomeTemplate.title || t("guest.welcome.titleDefault"))}</h2>
+            <p className="mt-3 text-sm text-stone-600">{withFriendName(welcomeTemplate.subtitle || t("guest.welcome.subtitleDefault"))}</p>
             <button
               className="mt-6 w-full rounded-2xl px-4 py-3 text-sm font-semibold text-white shadow-md transition hover:opacity-95"
               style={{ backgroundColor: welcomeTemplate.buttonColor || "#111827" }}
               onClick={enterMenu}
             >
-              {withFriendName(welcomeTemplate.buttonText || "开始点餐")}
+              {withFriendName(welcomeTemplate.buttonText || t("guest.welcome.buttonDefault"))}
             </button>
           </div>
         </div>

@@ -453,7 +453,7 @@ export default function AdminPage() {
       setSelectedOrderIds([]);
       await refresh(true);
     } else {
-      setMessage(d.message || "批量删除失败");
+      setMessage(d.message || t("errors.DELETE_FAILED"));
     }
   }
 
