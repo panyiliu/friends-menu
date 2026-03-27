@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:webpack": "next dev --webpack",
-    "dev:3000": "next dev -p 3000",
+    "dev:3000": "next dev --webpack -p 3000",
     "build": "next build",
     "prestart": "node scripts/check-next-build.cjs",
     "start": "next start",

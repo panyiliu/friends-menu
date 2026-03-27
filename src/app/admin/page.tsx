@@ -77,6 +77,27 @@ type AdminUser = {
   createdAt: string;
   updatedAt: string;
 };
+type AiLogItem = {
+  id: string;
+  functionCode: string;
+  status: string;
+  errorMessage: string;
+  createdAt: string;
+  requestPayload: unknown;
+  responsePayload: unknown;
+};
+type AiConfirmItem = {
+  dishId: string;
+  dishNameCn: string;
+  categoryId: string;
+  categoryNameCn: string;
+  nameEnCommitted: string;
+  categoryEnCommitted: string;
+  nameEnDraft: string;
+  categoryEnDraft: string;
+  success: boolean;
+  error?: string;
+};
 
 const tabs = ["menu", "orders", "settings"] as const;
 
@@ -145,6 +166,8 @@ export default function AdminPage() {
   const [inviteTemplateDrafts, setInviteTemplateDrafts] = useState<Record<string, WelcomeTemplate>>({});
   const [recentSavedDishId, setRecentSavedDishId] = useState("");
   const [isOrderMultiSelect, setIsOrderMultiSelect] = useState(false);
+  const [isDishMultiSelect, setIsDishMultiSelect] = useState(false);
+  const [selectedDishIds, setSelectedDishIds] = useState<string[]>([]);
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const drawerFileInputRef = useRef<HTMLInputElement | null>(null);
   const restoreZipInputRef = useRef<HTMLInputElement | null>(null);
@@ -165,6 +188,30 @@ export default function AdminPage() {
   const redirectingRef = useRef(false);
   const [debugUi, setDebugUi] = useState(false);
   const [backendVersion, setBackendVersion] = useState<{ gitSha: string; buildTime: string } | null>(null);
+  const [aiConfig, setAiConfig] = useState<{
+    provider: string;
+    model: string;
+    apiKeyMasked: string;
+    promptGenerateDishEnInfo: string;
+    enabled: boolean;
+  } | null>(null);
+  const [aiConfigLoading, setAiConfigLoading] = useState(false);
+  const [aiConfigSaving, setAiConfigSaving] = useState(false);
+  const [aiPromptOverride, setAiPromptOverride] = useState("");
+  const [aiAutofillRunning, setAiAutofillRunning] = useState(false);
+  const [aiConnectionTesting, setAiConnectionTesting] = useState(false);
+  const [aiConnectionResult, setAiConnectionResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [aiLogsOpen, setAiLogsOpen] = useState(false);
+  const [aiLogsLoading, setAiLogsLoading] = useState(false);
+  const [aiLogs, setAiLogs] = useState<AiLogItem[]>([]);
+  const [aiInlineLogs, setAiInlineLogs] = useState<AiLogItem[]>([]);
+  const [aiInlineLogBatchId, setAiInlineLogBatchId] = useState("");
+  const [aiSystemPrompt, setAiSystemPrompt] = useState("");
+  const [aiMergedPromptPreview, setAiMergedPromptPreview] = useState("");
+  const [aiConfirmOpen, setAiConfirmOpen] = useState(false);
+  const [aiConfirmSaving, setAiConfirmSaving] = useState(false);
+  const [aiConfirmItems, setAiConfirmItems] = useState<AiConfirmItem[]>([]);
+  const aiInlineLogTimerRef = useRef<number | null>(null);
 
   const statusText = (status: Order["status"]) => t(`guest.my.status.${status}`);
   const inviteLink = useMemo(() => (invite?.token ? `${globalThis.location?.origin || ""}/menu/${invite.token}` : ""), [invite]);
@@ -201,6 +248,249 @@ export default function AdminPage() {
       return { ok: false };
     }
   };
+
+  function getAiLogSummary(log: AiLogItem) {
+    const req = (log.requestPayload && typeof log.requestPayload === "object")
+      ? (log.requestPayload as Record<string, unknown>)
+      : {};
+    const rsp = (log.responsePayload && typeof log.responsePayload === "object")
+      ? (log.responsePayload as Record<string, unknown>)
+      : {};
+    const eventType = String(rsp.eventType || req.eventType || "");
+    const method = String(req.method || "");
+    const endpoint = String(req.endpoint || "");
+    const duration = typeof rsp.durationMs === "number" ? `${rsp.durationMs}ms` : "";
+    if (eventType || method || endpoint || duration) {
+      return [eventType, method, endpoint, duration].filter(Boolean).join(" | ");
+    }
+    return log.functionCode;
+  }
+
+  async function loadAiConfig() {
+    setAiConfigLoading(true);
+    try {
+      const res = await fetch("/api/admin/ai/config", { cache: "no-store" });
+      const d = await safeJson(res);
+      if (d?.success && d.data) {
+        setAiConfig({
+          provider: String(d.data.provider || ""),
+          model: String(d.data.model || ""),
+          apiKeyMasked: String(d.data.apiKeyMasked || ""),
+          promptGenerateDishEnInfo: String(d.data.promptGenerateDishEnInfo || ""),
+          enabled: Boolean(d.data.enabled),
+        });
+      } else {
+        setAiConfig(null);
+      }
+    } catch {
+      setAiConfig(null);
+    } finally {
+      setAiConfigLoading(false);
+    }
+    await loadAiPromptPreview();
+  }
+
+  async function loadAiLogs(batchId?: string) {
+    setAiLogsLoading(true);
+    try {
+      const qs = batchId ? `?limit=120&batchId=${encodeURIComponent(batchId)}` : "?limit=120";
+      const res = await fetch(`/api/admin/ai/logs${qs}`, { cache: "no-store" });
+      const d = await safeJson(res);
+      if (d?.success && Array.isArray(d.data)) {
+        setAiLogs(d.data);
+      } else {
+        setAiLogs([]);
+      }
+    } catch {
+      setAiLogs([]);
+    } finally {
+      setAiLogsLoading(false);
+    }
+  }
+
+  async function loadAiPromptPreview() {
+    try {
+      const res = await fetch("/api/admin/ai/prompt-preview", { cache: "no-store" });
+      const d = await safeJson(res);
+      if (d?.success && d.data) {
+        setAiSystemPrompt(String(d.data.systemPrompt || ""));
+        setAiMergedPromptPreview(String(d.data.mergedPrompt || ""));
+      } else {
+        setAiSystemPrompt("");
+        setAiMergedPromptPreview("");
+      }
+    } catch {
+      setAiSystemPrompt("");
+      setAiMergedPromptPreview("");
+    }
+  }
+
+  async function loadAiInlineLogs(batchId: string) {
+    if (!batchId) return;
+    try {
+      const res = await fetch(`/api/admin/ai/logs?limit=120&batchId=${encodeURIComponent(batchId)}`, { cache: "no-store" });
+      const d = await safeJson(res);
+      if (d?.success && Array.isArray(d.data)) {
+        setAiInlineLogs(d.data);
+      }
+    } catch {
+      // ignore inline log poll errors
+    }
+  }
+
+  function startAiInlineLogPolling(batchId: string) {
+    if (!batchId) return;
+    if (aiInlineLogTimerRef.current) {
+      window.clearInterval(aiInlineLogTimerRef.current);
+      aiInlineLogTimerRef.current = null;
+    }
+    aiInlineLogTimerRef.current = window.setInterval(() => {
+      void loadAiInlineLogs(batchId);
+    }, 1000);
+  }
+
+  function stopAiInlineLogPolling() {
+    if (aiInlineLogTimerRef.current) {
+      window.clearInterval(aiInlineLogTimerRef.current);
+      aiInlineLogTimerRef.current = null;
+    }
+  }
+
+  async function clearAiLogs() {
+    try {
+      const res = await fetch("/api/admin/ai/logs", { method: "DELETE" });
+      const d = await safeJson(res);
+      if (!d.success) {
+        setMessage(d.error || "清空 AI 日志失败");
+        return;
+      }
+      setAiLogs([]);
+      setMessage(`AI 日志已清空，共删除 ${d.deleted || 0} 条`);
+    } catch {
+      setMessage("清空 AI 日志失败");
+    }
+  }
+
+  function clearAiInlineLogsOnly() {
+    setAiInlineLogs([]);
+    setAiInlineLogBatchId("");
+    stopAiInlineLogPolling();
+  }
+
+  async function runAiAutofillForMissing() {
+    const targets = dishes.filter((dish) => {
+      const category = categories.find((x) => x.id === dish.categoryId);
+      const missingDishEn = !dish.englishName || !dish.englishName.trim();
+      const missingCategoryEn = !category?.englishName || !category.englishName.trim();
+      return missingDishEn || missingCategoryEn;
+    });
+
+    if (targets.length === 0) {
+      setMessage("当前菜单没有需要补全的英文字段");
+      return;
+    }
+
+    const batchId = `menu_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    setAiAutofillRunning(true);
+    setAiInlineLogBatchId(batchId);
+    setAiInlineLogs([]);
+    startAiInlineLogPolling(batchId);
+    try {
+      const payload = targets.map((d) => {
+        const category = categories.find((c) => c.id === d.categoryId);
+        return { dishId: d.id, name_cn: d.name, category_cn: category?.name || "" };
+      });
+      const res = await fetch("/api/admin/ai/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ functionCode: "generate_dish_en_info", batchId, input: payload }),
+      });
+      const out = await safeJson(res);
+      if (!out?.success || !Array.isArray(out?.data)) {
+        setMessage(out?.error || "AI 自动补全失败");
+        await loadAiInlineLogs(batchId);
+        setAiLogsOpen(true);
+        await loadAiLogs(batchId);
+        return;
+      }
+      const items = out.data as Array<{
+        dishId: string;
+        success: boolean;
+        name_en?: string;
+        category_en?: string;
+        error?: string;
+        writeback?: { dishEnglishNameUpdated?: boolean; categoryEnglishNameUpdated?: boolean };
+      }>;
+      const itemByDishId = new Map(items.map((x) => [String(x.dishId), x]));
+      const totalOk = items.filter((x) => x.success).length;
+      const totalFail = items.length - totalOk;
+      const confirmRows: AiConfirmItem[] = targets.map((src) => {
+        const item = itemByDishId.get(src.id);
+        const safeItem = item || {
+          dishId: src.id,
+          success: false,
+          name_en: "",
+          category_en: "",
+          error: "未返回该菜品结果",
+          writeback: { dishEnglishNameUpdated: false, categoryEnglishNameUpdated: false },
+        };
+        const category = categories.find((c) => c.id === src.categoryId);
+        return {
+          dishId: src.id,
+          dishNameCn: src.name,
+          categoryId: src.categoryId,
+          categoryNameCn: category?.name || "",
+          nameEnCommitted: String(
+            safeItem.success && safeItem.writeback?.dishEnglishNameUpdated ? (safeItem.name_en || "") : (src.englishName || ""),
+          ),
+          categoryEnCommitted: String(
+            safeItem.success && safeItem.writeback?.categoryEnglishNameUpdated
+              ? (safeItem.category_en || "")
+              : (category?.englishName || ""),
+          ),
+          nameEnDraft: String(
+            safeItem.success && safeItem.writeback?.dishEnglishNameUpdated ? (safeItem.name_en || "") : (src.englishName || ""),
+          ),
+          categoryEnDraft: String(
+            safeItem.success && safeItem.writeback?.categoryEnglishNameUpdated
+              ? (safeItem.category_en || "")
+              : (category?.englishName || ""),
+          ),
+          success: Boolean(safeItem.success),
+          error: safeItem.error ? String(safeItem.error) : undefined,
+        };
+      });
+
+      setDishes((prev) =>
+        prev.map((d) => {
+          const item = itemByDishId.get(d.id);
+          if (!item?.success || !item.writeback?.dishEnglishNameUpdated || !item.name_en) return d;
+          return { ...d, englishName: item.name_en };
+        }),
+      );
+      setCategories((prev) =>
+        prev.map((c) => {
+          const hit = items.find((x) => {
+            if (!x.success || !x.writeback?.categoryEnglishNameUpdated || !x.category_en) return false;
+            const dish = targets.find((t) => t.id === x.dishId);
+            return dish?.categoryId === c.id;
+          });
+          return hit ? { ...c, englishName: String(hit.category_en || c.englishName || "") } : c;
+        }),
+      );
+      setMessage(`AI 自动补全完成：成功 ${totalOk} 条，失败 ${totalFail} 条（仅补空字段，不覆盖已有英文）。`);
+      await loadAiInlineLogs(batchId);
+      setAiLogsOpen(true);
+      await loadAiLogs(batchId);
+      setAiConfirmItems(confirmRows);
+      setAiConfirmOpen(true);
+    } catch {
+      setMessage("AI 自动补全失败");
+    } finally {
+      stopAiInlineLogPolling();
+      setAiAutofillRunning(false);
+    }
+  }
 
   function toLocalDatetimeValue(d: Date) {
     const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -933,6 +1223,122 @@ export default function AdminPage() {
     setCategoryEnglishDrafts(Object.fromEntries(categories.map((c) => [c.id, String(c.englishName || "")])));
   }, [categories]);
 
+  useEffect(() => {
+    const initAiPanel = async () => {
+      try {
+        const cfgRes = await fetch("/api/admin/ai/config", { cache: "no-store" });
+        const cfgText = await cfgRes.text();
+        const cfg = JSON.parse(cfgText);
+        if (cfg?.success && cfg.data) {
+          setAiConfig({
+            provider: String(cfg.data.provider || ""),
+            model: String(cfg.data.model || ""),
+            apiKeyMasked: String(cfg.data.apiKeyMasked || ""),
+            promptGenerateDishEnInfo: String(cfg.data.promptGenerateDishEnInfo || ""),
+            enabled: Boolean(cfg.data.enabled),
+          });
+        }
+      } catch {
+        // ignore init config errors
+      }
+
+      try {
+        const promptRes = await fetch("/api/admin/ai/prompt-preview", { cache: "no-store" });
+        const promptText = await promptRes.text();
+        const prompt = JSON.parse(promptText);
+        if (prompt?.success && prompt.data) {
+          setAiSystemPrompt(String(prompt.data.systemPrompt || ""));
+          setAiMergedPromptPreview(String(prompt.data.mergedPrompt || ""));
+        }
+      } catch {
+        // ignore init prompt errors
+      }
+    };
+
+    void initAiPanel();
+    return () => {
+      stopAiInlineLogPolling();
+    };
+  }, []);
+
+  async function saveAiConfirmChanges() {
+    if (aiConfirmSaving) return;
+    const changedDishItems = aiConfirmItems.filter((x) => x.success && x.nameEnDraft.trim() !== x.nameEnCommitted.trim());
+    const changedCategoryItems = aiConfirmItems.filter(
+      (x) => x.success && x.categoryEnDraft.trim() !== x.categoryEnCommitted.trim(),
+    );
+    if (changedDishItems.length === 0 && changedCategoryItems.length === 0) {
+      setAiConfirmOpen(false);
+      return;
+    }
+
+    setAiConfirmSaving(true);
+    try {
+      const dishUpdates = changedDishItems.map((x) => ({
+        dishId: x.dishId,
+        englishName: x.nameEnDraft.trim(),
+      }));
+      const categoryMap = new Map<string, string>();
+      for (const item of changedCategoryItems) {
+        categoryMap.set(item.categoryId, item.categoryEnDraft.trim());
+      }
+      const categoryUpdates = Array.from(categoryMap.entries()).map(([categoryId, englishName]) => ({
+        categoryId,
+        englishName,
+      }));
+
+      const res = await fetch("/api/admin/ai/confirm-writeback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dishUpdates,
+          categoryUpdates,
+        }),
+      });
+      const out = await safeJson(res);
+      if (!out?.success) {
+        setMessage(out?.error || "AI 结果确认保存失败");
+        return;
+      }
+
+      const dishUpdateMap = new Map(dishUpdates.map((x) => [x.dishId, x.englishName]));
+      const categoryUpdateMap = new Map(categoryUpdates.map((x) => [x.categoryId, x.englishName]));
+      setDishes((prev) =>
+        prev.map((d) =>
+          dishUpdateMap.has(d.id)
+            ? {
+                ...d,
+                englishName: String(dishUpdateMap.get(d.id) || ""),
+              }
+            : d,
+        ),
+      );
+      setCategories((prev) =>
+        prev.map((c) =>
+          categoryUpdateMap.has(c.id)
+            ? {
+                ...c,
+                englishName: String(categoryUpdateMap.get(c.id) || ""),
+              }
+            : c,
+        ),
+      );
+      setAiConfirmItems((prev) =>
+        prev.map((x) => ({
+          ...x,
+          nameEnCommitted: x.nameEnDraft.trim(),
+          categoryEnCommitted: x.categoryEnDraft.trim(),
+        })),
+      );
+      setAiConfirmOpen(false);
+      setMessage("AI 结果确认修改已保存（含清空字段）");
+    } catch {
+      setMessage("AI 结果确认保存失败");
+    } finally {
+      setAiConfirmSaving(false);
+    }
+  }
+
   if (!authedChecked) {
     return (
       <main className="min-h-screen bg-zinc-50">
@@ -1042,7 +1448,51 @@ export default function AdminPage() {
                 重置筛选
               </button>
             </div>
+            <div>
+              <button
+                type="button"
+                className="rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
+                disabled={!aiConfig?.enabled || aiAutofillRunning}
+                onClick={() => void runAiAutofillForMissing()}
+              >
+                {aiAutofillRunning ? "AI补全中..." : "AI自动补全缺失英文（全菜单）"}
+              </button>
+            </div>
           </div>
+          {(aiAutofillRunning || aiInlineLogs.length > 0) ? (
+            <div className="mb-4 rounded-xl border border-zinc-200 bg-white p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold text-zinc-700">
+                  主页 AI 实时日志{aiInlineLogBatchId ? `（批次 ${aiInlineLogBatchId}）` : ""}
+                </p>
+                <button
+                  type="button"
+                  className="rounded-lg border border-zinc-300 px-2 py-1 text-[11px] hover:bg-zinc-50"
+                  onClick={() => clearAiInlineLogsOnly()}
+                >
+                  清空显示
+                </button>
+              </div>
+              <div className="max-h-56 overflow-auto rounded-lg border border-zinc-100 bg-zinc-50">
+                {aiInlineLogs.length === 0 ? (
+                  <p className="p-2 text-xs text-zinc-500">{aiAutofillRunning ? "日志生成中..." : "暂无日志"}</p>
+                ) : (
+                  aiInlineLogs.map((log) => (
+                    <div key={log.id} className="border-b border-zinc-100 p-2 text-[11px] last:border-b-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-700">{getAiLogSummary(log)}</span>
+                        <span className={log.status === "SUCCESS" ? "text-emerald-600" : "text-red-600"}>{log.status}</span>
+                      </div>
+                      <div className="text-zinc-500">{new Date(log.createdAt).toLocaleTimeString()}</div>
+                      <pre className="mt-1 whitespace-pre-wrap text-zinc-600">{JSON.stringify(log.requestPayload, null, 2)}</pre>
+                      <pre className="mt-1 whitespace-pre-wrap text-zinc-600">{JSON.stringify(log.responsePayload, null, 2)}</pre>
+                      {log.errorMessage ? <div className="mt-1 text-red-600">{log.errorMessage}</div> : null}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
           <div className="space-y-6">
             {categories
               .filter((c) => (menuCategoryId ? c.id === menuCategoryId : true))
@@ -1066,12 +1516,28 @@ export default function AdminPage() {
                         <h2 className="text-xl font-bold text-stone-800">{displayCategoryName(c)}</h2>
                         <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-500">{list.length} 道</span>
                       </div>
-                      <button
-                        className="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 transition hover:bg-amber-100"
-                        onClick={() => startCreateDish(c.id)}
-                      >
-                        + 新增菜品
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 transition hover:bg-amber-100"
+                          onClick={() => startCreateDish(c.id)}
+                        >
+                          + 新增菜品
+                        </button>
+                        <button
+                          type="button"
+                          className={`flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs ${
+                            isDishMultiSelect
+                              ? "border-zinc-900 bg-zinc-900 text-white"
+                              : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
+                          }`}
+                          onClick={() => {
+                            setIsDishMultiSelect((v) => !v);
+                            setSelectedDishIds([]);
+                          }}
+                        >
+                          {isDishMultiSelect ? "退出多选" : "菜品多选"}
+                        </button>
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                       {list.map((d) => {
@@ -1080,13 +1546,24 @@ export default function AdminPage() {
                           return t && availableTagSet.has(t) ? t : "";
                         })();
                         const isActive = Boolean(d.isAvailable);
+                        const checked = selectedDishIds.includes(d.id);
                         return (
                           <button
                             key={d.id}
                             className={`group overflow-hidden rounded-xl border text-left transition-all duration-200 hover:shadow-md ${
                               isActive ? "border-stone-100 bg-white" : "border-stone-200 bg-stone-50/40"
-                            } ${recentSavedDishId === d.id ? "border-emerald-200 ring-2 ring-emerald-200" : ""}`}
-                            onClick={() => openDishEditor(d)}
+                            } ${recentSavedDishId === d.id ? "border-emerald-200 ring-2 ring-emerald-200" : ""} ${
+                              isDishMultiSelect && checked ? "ring-2 ring-zinc-900" : ""
+                            }`}
+                            onClick={() => {
+                              if (isDishMultiSelect) {
+                                setSelectedDishIds((prev) =>
+                                  checked ? prev.filter((id) => id !== d.id) : [...new Set([...prev, d.id])],
+                                );
+                              } else {
+                                openDishEditor(d);
+                              }
+                            }}
                           >
                             <div className="relative h-32 bg-gradient-to-br from-amber-100/60 to-orange-100/60">
                               {d.images?.[0]?.url ? <Image src={d.images[0].url} alt="dish" fill sizes="33vw" className="object-cover opacity-90" /> : null}
@@ -1098,6 +1575,19 @@ export default function AdminPage() {
                                 >
                                   {isActive ? "可点" : "售罄"}
                                 </span>
+                                {isDishMultiSelect ? (
+                                  <input
+                                    type="checkbox"
+                                    className="ml-2 h-4 w-4 rounded border-zinc-300 text-zinc-900"
+                                    checked={checked}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedDishIds((prev) =>
+                                        e.target.checked ? [...new Set([...prev, d.id])] : prev.filter((id) => id !== d.id),
+                                      );
+                                    }}
+                                  />
+                                ) : null}
                               </div>
                             </div>
                             <div className="p-3">
@@ -1126,6 +1616,70 @@ export default function AdminPage() {
                         );
                       })}
                     </div>
+                  {isDishMultiSelect ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        className="rounded-xl border border-zinc-300 px-3 py-1.5 text-xs hover:bg-zinc-50"
+                        onClick={() =>
+                          setSelectedDishIds((prev) =>
+                            prev.length === list.length ? [] : list.map((d) => d.id),
+                          )
+                        }
+                      >
+                        {selectedDishIds.length === list.length ? "取消全选本分类" : "全选本分类"}
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-xl border border-zinc-900 bg-zinc-900 px-3 py-1.5 text-xs text-white disabled:opacity-50"
+                        disabled={selectedDishIds.length === 0 || !aiConfig?.enabled}
+                        onClick={async () => {
+                          const targets = dishes.filter(
+                            (d) =>
+                              selectedDishIds.includes(d.id) &&
+                              (!d.englishName || !d.englishName.trim()),
+                          );
+                          if (targets.length === 0) {
+                            setMessage("所选菜品暂无需要生成的英文名");
+                            return;
+                          }
+                          const payload = targets.map((d) => {
+                            const cat = categories.find((c) => c.id === d.categoryId);
+                            return {
+                              dishId: d.id,
+                              name_cn: d.name,
+                              category_cn: cat?.name || "",
+                            };
+                          });
+                          try {
+                            const res = await fetch("/api/admin/ai/execute", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                functionCode: "generate_dish_en_info",
+                                input: payload,
+                              }),
+                            });
+                            const d = await safeJson(res);
+                            if (!d.success || !Array.isArray(d.data)) {
+                              setMessage(d.error || "批量 AI 生成失败");
+                              return;
+                            }
+                            const okCount = d.data.filter((x: { success: boolean }) => x.success).length;
+                            const failCount = d.data.length - okCount;
+                            setMessage(
+                              `批量 AI 已执行：成功 ${okCount} 条，失败 ${failCount} 条。成功结果已写入数据库，如需微调可逐条进入编辑后保存。`,
+                            );
+                            void refresh(false);
+                          } catch {
+                            setMessage("批量 AI 生成失败");
+                          }
+                        }}
+                      >
+                        批量 AI 生成英文（{selectedDishIds.length}）
+                      </button>
+                    </div>
+                  ) : null}
                   </div>
                 );
               })}
@@ -1144,7 +1698,14 @@ export default function AdminPage() {
                   </button>
                 </div>
                 <input className="w-full rounded-xl border border-zinc-200 px-2 py-1" value={selectedDish.name} onChange={(e) => setSelectedDish({ ...selectedDish, name: e.target.value })} />
-                <input className="mt-2 w-full rounded-xl border border-zinc-200 px-2 py-1" value={selectedDish.englishName || ""} onChange={(e) => setSelectedDish({ ...selectedDish, englishName: e.target.value })} placeholder="英文名（可选）" />
+                <div className="mt-2">
+                  <input
+                    className="w-full rounded-xl border border-zinc-200 px-2 py-1"
+                    value={selectedDish.englishName || ""}
+                    onChange={(e) => setSelectedDish({ ...selectedDish, englishName: e.target.value })}
+                    placeholder="英文名（可选）"
+                  />
+                </div>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <select className="rounded-xl border border-zinc-200 px-2 py-1" value={selectedDish.categoryId} onChange={(e) => setSelectedDish({ ...selectedDish, categoryId: e.target.value })}>
                     {categories.map((c) => (
@@ -2002,6 +2563,300 @@ export default function AdminPage() {
                 保存系统设置
               </button>
             </div>
+
+            <div className="mt-6 border-t border-dashed border-zinc-200 pt-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">AI 设置</h3>
+                <button
+                  type="button"
+                  className="rounded-xl border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50"
+                  onClick={() => void loadAiConfig()}
+                  disabled={aiConfigLoading}
+                >
+                  {aiConfigLoading ? "加载中..." : "重新加载"}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-zinc-500">配置 AI 服务提供商、模型和默认提示词，用于自动生成英文信息。</p>
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                <div>
+                  <label className="block text-xs text-zinc-600">Provider</label>
+                  <input
+                    className="mt-1 w-full rounded-xl border border-zinc-200 px-2 py-1 text-sm"
+                    placeholder="例如：doubao"
+                    value={aiConfig?.provider || ""}
+                    onChange={(e) =>
+                      setAiConfig((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              provider: e.target.value,
+                            }
+                          : {
+                              provider: e.target.value,
+                              model: "",
+                              apiKeyMasked: "",
+                              promptGenerateDishEnInfo: "",
+                              enabled: true,
+                            },
+                      )
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-zinc-600">Model</label>
+                  <input
+                    className="mt-1 w-full rounded-xl border border-zinc-200 px-2 py-1 text-sm"
+                    placeholder="例如：doubao-seed-2-0-pro"
+                    value={aiConfig?.model || ""}
+                    onChange={(e) =>
+                      setAiConfig((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              model: e.target.value,
+                            }
+                          : {
+                              provider: "",
+                              model: e.target.value,
+                              apiKeyMasked: "",
+                              promptGenerateDishEnInfo: "",
+                              enabled: true,
+                            },
+                      )
+                    }
+                  />
+                </div>
+              </div>
+              <div className="mt-2 grid gap-2 md:grid-cols-2">
+                <div>
+                  <label className="block text-xs text-zinc-600">API Key</label>
+                  <input
+                    type="password"
+                    className="mt-1 w-full rounded-xl border border-zinc-200 px-2 py-1 text-sm"
+                    placeholder={aiConfig?.apiKeyMasked ? `已配置：${aiConfig.apiKeyMasked}` : "首次配置需填写完整 Key"}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setAiConfig((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              apiKeyMasked: val ? "****" : prev.apiKeyMasked,
+                            }
+                          : {
+                              provider: "",
+                              model: "",
+                              apiKeyMasked: val ? "****" : "",
+                              promptGenerateDishEnInfo: "",
+                              enabled: true,
+                            },
+                      );
+                      setAiPromptOverride(val);
+                    }}
+                  />
+                  <p className="mt-1 text-xs text-zinc-500">留空表示保留原有 Key，不会修改。</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-zinc-600">启用 AI 功能</label>
+                  <button
+                    type="button"
+                    className={`rounded-full px-3 py-1 text-xs ${
+                      aiConfig?.enabled ? "bg-emerald-500 text-white" : "border border-zinc-300 bg-white text-zinc-600"
+                    }`}
+                    onClick={() =>
+                      setAiConfig((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              enabled: !prev.enabled,
+                            }
+                          : {
+                              provider: "",
+                              model: "",
+                              apiKeyMasked: "",
+                              promptGenerateDishEnInfo: "",
+                              enabled: true,
+                            },
+                      )
+                    }
+                  >
+                    {aiConfig?.enabled ? "已启用" : "未启用"}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2">
+                <label className="block text-xs text-zinc-600">系统内置提示词（只读）</label>
+                <textarea
+                  className="mt-1 h-24 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs text-zinc-700"
+                  value={aiSystemPrompt}
+                  readOnly
+                />
+              </div>
+              <div className="mt-2">
+                <label className="block text-xs text-zinc-600">默认提示词（生成菜品英文信息）</label>
+                <textarea
+                  className="mt-1 h-28 w-full rounded-xl border border-zinc-200 px-2 py-1 text-xs"
+                  placeholder="可选：在系统默认提示词基础上追加你自己的风格要求，例如：翻译要简洁、符合西式菜单习惯等。"
+                  value={aiConfig?.promptGenerateDishEnInfo || ""}
+                  onChange={(e) =>
+                    setAiConfig((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            promptGenerateDishEnInfo: e.target.value,
+                          }
+                        : {
+                            provider: "",
+                            model: "",
+                            apiKeyMasked: "",
+                            promptGenerateDishEnInfo: e.target.value,
+                            enabled: true,
+                          },
+                    )
+                  }
+                  onBlur={() => void loadAiPromptPreview()}
+                />
+              </div>
+              <div className="mt-2">
+                <label className="block text-xs text-zinc-600">最终拼接提示词预览（只读）</label>
+                <textarea
+                  className="mt-1 h-28 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs text-zinc-700"
+                  value={aiMergedPromptPreview}
+                  readOnly
+                />
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className="rounded-xl border border-zinc-300 px-3 py-1 text-xs hover:bg-zinc-50 disabled:opacity-60"
+                    disabled={aiConnectionTesting || !aiConfig?.enabled}
+                    onClick={async () => {
+                      setAiConnectionTesting(true);
+                      setAiConnectionResult(null);
+                      try {
+                        const res = await fetch("/api/admin/ai/test-connection", { method: "POST" });
+                        const d = await safeJson(res);
+                        if (!d.success) {
+                          const message = d.error || "连通性测试失败";
+                          setAiConnectionResult({ ok: false, message });
+                          setMessage(message);
+                        } else {
+                          const message = `连通性测试成功，耗时 ${d.durationMs}ms`;
+                          setAiConnectionResult({ ok: true, message });
+                          setMessage(message);
+                        }
+                        if (aiLogsOpen) await loadAiLogs();
+                      } catch {
+                        setAiConnectionResult({ ok: false, message: "连通性测试失败" });
+                        setMessage("连通性测试失败");
+                      } finally {
+                        setAiConnectionTesting(false);
+                      }
+                    }}
+                  >
+                    {aiConnectionTesting ? "测试中..." : "测试连通性"}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-xl border border-zinc-300 px-3 py-1 text-xs hover:bg-zinc-50"
+                    onClick={async () => {
+                      const next = !aiLogsOpen;
+                      setAiLogsOpen(next);
+                      if (next) await loadAiLogs();
+                    }}
+                  >
+                    {aiLogsOpen ? "关闭 AI 日志" : "打开 AI 日志"}
+                  </button>
+                  {aiConnectionResult ? (
+                    <span className={`text-xs ${aiConnectionResult.ok ? "text-emerald-600" : "text-red-600"}`}>
+                      {aiConnectionResult.message}
+                    </span>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  className="rounded-xl bg-zinc-900 px-3 py-1 text-xs text-white disabled:opacity-60"
+                  disabled={aiConfigSaving}
+                  onClick={async () => {
+                    if (!aiConfig) return;
+                    setAiConfigSaving(true);
+                    try {
+                      const res = await fetch("/api/admin/ai/config", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          provider: aiConfig.provider,
+                          model: aiConfig.model,
+                          apiKey: aiPromptOverride || undefined,
+                          promptGenerateDishEnInfo: aiConfig.promptGenerateDishEnInfo,
+                          enabled: aiConfig.enabled,
+                        }),
+                      });
+                      const d = await safeJson(res);
+                      if (!d.success) {
+                        setMessage(d.error || "AI 配置保存失败");
+                      } else {
+                        setMessage("AI 配置已保存");
+                        setAiPromptOverride("");
+                        await loadAiConfig();
+                        await loadAiPromptPreview();
+                      }
+                    } catch {
+                      setMessage("AI 配置保存失败");
+                    } finally {
+                      setAiConfigSaving(false);
+                    }
+                  }}
+                >
+                  {aiConfigSaving ? "保存中..." : "保存 AI 配置"}
+                </button>
+              </div>
+              {aiLogsOpen ? (
+                <div className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-xs font-semibold text-zinc-700">AI 日志控制台（仅 AI 链路）</p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="rounded-lg border border-zinc-300 px-2 py-1 text-[11px] hover:bg-white"
+                        onClick={() => void loadAiLogs()}
+                      >
+                        刷新
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-lg border border-red-300 px-2 py-1 text-[11px] text-red-600 hover:bg-red-50"
+                        onClick={() => void clearAiLogs()}
+                      >
+                        清空
+                      </button>
+                    </div>
+                  </div>
+                  <div className="max-h-64 overflow-auto rounded-lg border border-zinc-200 bg-white">
+                    {aiLogsLoading ? (
+                      <p className="p-2 text-xs text-zinc-500">日志加载中...</p>
+                    ) : aiLogs.length === 0 ? (
+                      <p className="p-2 text-xs text-zinc-500">暂无日志</p>
+                    ) : (
+                      aiLogs.map((log) => (
+                        <div key={log.id} className="border-b border-zinc-100 p-2 text-[11px] last:border-b-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-zinc-700">{getAiLogSummary(log)}</span>
+                            <span className={log.status === "SUCCESS" ? "text-emerald-600" : "text-red-600"}>
+                              {log.status}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-zinc-500">{new Date(log.createdAt).toLocaleString()}</div>
+                          <pre className="mt-1 whitespace-pre-wrap text-zinc-600">{JSON.stringify(log.requestPayload, null, 2)}</pre>
+                          <pre className="mt-1 whitespace-pre-wrap text-zinc-600">{JSON.stringify(log.responsePayload, null, 2)}</pre>
+                          {log.errorMessage ? <div className="mt-1 text-red-600">{log.errorMessage}</div> : null}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
           <div className={`rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm ${settingsSubTab === "users" ? "" : "hidden"}`}>
             <h2 className="font-semibold">{t("admin.settings.usersTitle")}</h2>
@@ -2075,6 +2930,71 @@ export default function AdminPage() {
         </section>
       ) : null}
       </div>
+      {aiConfirmOpen ? (
+        <div className="fixed inset-0 z-40">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setAiConfirmOpen(false)} />
+          <div className="absolute left-1/2 top-1/2 max-h-[80vh] w-[min(980px,94vw)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
+              <h3 className="text-sm font-semibold text-zinc-800">AI 批量补全结果确认（首轮已入库）</h3>
+              <button className="rounded-lg border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-50" onClick={() => setAiConfirmOpen(false)}>
+                关闭
+              </button>
+            </div>
+            <div className="max-h-[58vh] overflow-auto p-4">
+              <div className="grid grid-cols-5 gap-2 text-xs font-semibold text-zinc-500">
+                <div>中文菜名</div>
+                <div>中文分类</div>
+                <div>英文菜名（可改）</div>
+                <div>英文分类（可改）</div>
+                <div>状态</div>
+              </div>
+              <div className="mt-2 space-y-2">
+                {aiConfirmItems.map((item, idx) => (
+                  <div key={`${item.dishId}_${idx}`} className="grid grid-cols-5 gap-2 rounded-lg border border-zinc-100 p-2">
+                    <div className="truncate text-xs text-zinc-700">{item.dishNameCn}</div>
+                    <div className="truncate text-xs text-zinc-700">{item.categoryNameCn}</div>
+                    <input
+                      className="rounded-lg border border-zinc-200 px-2 py-1 text-xs"
+                      value={item.nameEnDraft}
+                      disabled={!item.success}
+                      onChange={(e) =>
+                        setAiConfirmItems((prev) =>
+                          prev.map((x, i) => (i === idx ? { ...x, nameEnDraft: e.target.value } : x)),
+                        )
+                      }
+                    />
+                    <input
+                      className="rounded-lg border border-zinc-200 px-2 py-1 text-xs"
+                      value={item.categoryEnDraft}
+                      disabled={!item.success}
+                      onChange={(e) =>
+                        setAiConfirmItems((prev) =>
+                          prev.map((x, i) => (i === idx ? { ...x, categoryEnDraft: e.target.value } : x)),
+                        )
+                      }
+                    />
+                    <div className={`text-xs ${item.success ? "text-emerald-600" : "text-red-600"}`}>
+                      {item.success ? "成功" : item.error || "失败"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-zinc-200 px-4 py-3">
+              <button className="rounded-xl border border-zinc-300 px-3 py-1 text-xs hover:bg-zinc-50" onClick={() => setAiConfirmOpen(false)}>
+                仅关闭（保持已入库结果）
+              </button>
+              <button
+                className="rounded-xl bg-zinc-900 px-3 py-1 text-xs text-white disabled:opacity-60"
+                disabled={aiConfirmSaving}
+                onClick={() => void saveAiConfirmChanges()}
+              >
+                {aiConfirmSaving ? "保存中..." : "保存我的修改"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <DebugLogPanel key={debugUi ? "dbg-on" : "dbg-off"} enabled={debugUi} fetchServerLogs />
     </main>
   );

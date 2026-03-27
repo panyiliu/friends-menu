@@ -1,4 +1,8 @@
 import type { NextConfig } from "next";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["192.168.50.242", "192.168.50.15", "localhost", "127.0.0.1"],
@@ -10,7 +14,9 @@ const nextConfig: NextConfig = {
    * Next 16 默认用 Turbopack 构建；若仅有 webpack 配置会报错。
    * 空对象表示「显式启用 Turbopack 配置位」，与下方仅用于 `next dev --webpack` 的 webpack 钩子并存。
    */
-  turbopack: {},
+  turbopack: {
+    root: projectRoot,
+  },
   /** `next dev --webpack` 时忽略 `.cursor` 等目录，避免本地调试日志写入仓库触发无意义重编译 */
   webpack: (config, { dev }) => {
     if (dev) {
