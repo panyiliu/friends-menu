@@ -183,7 +183,14 @@ docker compose up -d --build
 
 浏览器访问 **`http://<服务器IP>:3000`**，后台 **`/admin/login`**，默认账号见上文「默认账号」。
 
-升级新版本：在同一目录 **`git pull`** 后执行 **`docker compose up -d --build`**。数据仍在 named volumes 中。
+升级新版本（推荐镜像模式）：在同一目录 **`git pull`** 后执行：
+
+```bash
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+`docker-compose.prod.yml` 使用 GHCR 镜像（`ghcr.io/panyiliu/friends-menu:main`），避免服务器本机 `next build` 卡住。
 
 ### 本地打包运行
 
@@ -234,6 +241,24 @@ docker compose down
 
 # 仅重启服务
 docker compose restart
+```
+
+### GHCR + Watchtower 推荐发布流
+
+1. 提交代码到 `main` 后，GitHub Actions 会自动构建并推送：
+   - `ghcr.io/panyiliu/friends-menu:main`
+   - `ghcr.io/panyiliu/friends-menu:sha-<short>`
+2. 服务器拉镜像并更新服务：
+
+```bash
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+3. 首次升级到图片新链路后，执行一次历史 URL 迁移：
+
+```bash
+docker compose -f docker-compose.prod.yml exec app npm run migrate:image-urls
 ```
 
 ## 生产可用模式（推荐）

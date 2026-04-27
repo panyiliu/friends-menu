@@ -8,7 +8,7 @@ WORKDIR /app
 ENV DATABASE_URL=file:/app/prisma/dev.db
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run prisma:generate && npm run build
+RUN npm run prisma:generate && npm run build -- --webpack
 
 FROM node:20.11.1-alpine AS runner
 ARG GIT_SHA=unknown

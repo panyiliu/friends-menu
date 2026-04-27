@@ -1,6 +1,6 @@
 services:
   app:
-    build: .
+    image: ghcr.io/panyiliu/friends-menu:main
     container_name: friends-menu
     ports:
       - "3000:3000"
