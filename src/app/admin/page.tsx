@@ -2,8 +2,9 @@
 
 import { DebugLogPanel } from "@/components/DebugLogPanel";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { VariantImage } from "@/components/VariantImage";
 import { useI18n } from "@/i18n";
-import Image from "next/image";
+import { normalizeUploadUrl } from "@/lib/image-variants";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type Category = { id: string; name: string; englishName?: string; sortOrder: number; isEnabled: boolean };
@@ -529,7 +530,12 @@ export default function AdminPage() {
       fetch("/api/admin/users").then(safeJson),
     ]);
     setCategories(c.data || []);
-    setDishes(d.data || []);
+    setDishes(
+      (d.data || []).map((dish: Dish) => ({
+        ...dish,
+        images: (dish.images || []).map((img) => ({ ...img, url: normalizeUploadUrl(String(img.url || "")) })),
+      })),
+    );
     const nextOrders = r.data || [];
     setSelectedOrderIds((prev) => prev.filter((id) => nextOrders.some((o: Order) => o.id === id)));
     setNewOrderIds((prev) => {
@@ -548,7 +554,7 @@ export default function AdminPage() {
         adminTitle: s.setting.adminTitle || "点餐系统",
         guestTitle: s.setting.guestTitle || "朋友·聚",
         guestSubtitle: s.setting.guestSubtitle || "欢聚时刻 · 臻选风味",
-        guestBannerUrl: s.setting.guestBannerUrl || "",
+        guestBannerUrl: normalizeUploadUrl(s.setting.guestBannerUrl || ""),
         welcomeAlwaysShow: Boolean(s.setting.welcomeAlwaysShow),
         refreshIntervalSec: s.setting.refreshIntervalSec || 8,
         emailEnabled: Boolean(s.setting.emailEnabled),
@@ -617,7 +623,7 @@ export default function AdminPage() {
       setMessage(up.message || t("errors.UPLOAD_FAILED"));
       return "";
     }
-    return String(up.url || "");
+    return normalizeUploadUrl(String(up.url || ""));
   }
 
   async function saveDish(dish: Dish, file?: File | null) {
@@ -1566,7 +1572,7 @@ export default function AdminPage() {
                             }}
                           >
                             <div className="relative h-32 bg-gradient-to-br from-amber-100/60 to-orange-100/60">
-                              {d.images?.[0]?.url ? <Image src={d.images[0].url} alt="dish" fill sizes="33vw" className="object-cover opacity-90" /> : null}
+                              {d.images?.[0]?.url ? <VariantImage src={d.images[0].url} alt="dish" variant="small" fill sizes="33vw" className="object-cover opacity-90" /> : null}
                               <div className="absolute right-2 top-2">
                                 <span
                                   className={`rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm ${
@@ -1734,7 +1740,7 @@ export default function AdminPage() {
                 <div className="mt-2 flex flex-wrap gap-2">
                   {selectedDish.images?.map((img) => (
                     <div key={img.id} className="rounded-xl border border-zinc-200 p-1">
-                      <Image src={img.url} alt="dish" width={56} height={56} className="h-14 w-14 rounded object-cover" />
+                      <VariantImage src={img.url} alt="dish" variant="thumb" width={56} height={56} className="h-14 w-14 rounded object-cover" />
                       <button className="mt-1 rounded-lg border border-zinc-300 px-1 py-0.5 text-xs hover:bg-zinc-50" onClick={() => void deleteDishImage(img.id)}>
                         删图
                       </button>
@@ -2525,7 +2531,7 @@ export default function AdminPage() {
                     const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
                     const d = await safeJson(res);
                     if (d.ok) {
-                      setSettings((prev) => ({ ...prev, guestBannerUrl: String(d.url || "") }));
+                      setSettings((prev) => ({ ...prev, guestBannerUrl: normalizeUploadUrl(String(d.url || "")) }));
                       setIsEditingSettings(true);
                       setMessage("Banner 已上传，请点击“保存系统设置”生效");
                     } else {
@@ -2554,7 +2560,7 @@ export default function AdminPage() {
             {settings.guestBannerUrl ? (
               <div className="mt-2 overflow-hidden rounded-xl border border-zinc-200">
                 <div className="relative h-24 w-full bg-zinc-50">
-                  <Image src={settings.guestBannerUrl} alt="banner-preview" fill sizes="100vw" className="object-cover" />
+                  <VariantImage src={settings.guestBannerUrl} alt="banner-preview" variant="large" fill sizes="100vw" className="object-cover" />
                 </div>
               </div>
             ) : null}

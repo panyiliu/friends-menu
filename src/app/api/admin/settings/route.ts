@@ -1,4 +1,5 @@
 import { ensureAdmin } from "@/lib/api-auth";
+import { normalizeUploadUrl } from "@/lib/image-variants";
 import { logError } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -16,7 +17,13 @@ export async function GET(req: NextRequest) {
   try {
     let setting = await prisma.systemSetting.findFirst();
     if (!setting) setting = await prisma.systemSetting.create({ data: {} });
-    return NextResponse.json({ ok: true, setting });
+    return NextResponse.json({
+      ok: true,
+      setting: {
+        ...setting,
+        guestBannerUrl: normalizeUploadUrl(setting.guestBannerUrl || ""),
+      },
+    });
   } catch (error) {
     await logError("admin_settings_get_failed", error);
     return NextResponse.json({ ok: false, message: schemaHint(error) || "系统设置读取失败" }, { status: 500 });
@@ -34,7 +41,7 @@ export async function PUT(req: NextRequest) {
       adminTitle: body.adminTitle || "点餐系统",
       guestTitle: body.guestTitle || "朋友·聚",
       guestSubtitle: body.guestSubtitle || "欢聚时刻 · 臻选风味",
-      guestBannerUrl: body.guestBannerUrl || "",
+      guestBannerUrl: normalizeUploadUrl(body.guestBannerUrl || ""),
       welcomeAlwaysShow: Boolean(body.welcomeAlwaysShow),
       refreshIntervalSec: Number(body.refreshIntervalSec || 8),
       emailEnabled: Boolean(body.emailEnabled),

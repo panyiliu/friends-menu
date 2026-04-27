@@ -1,10 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { VariantImage } from "@/components/VariantImage";
 import { useI18n } from "@/i18n";
+import { normalizeUploadUrl } from "@/lib/image-variants";
 
 type Dish = { id: string; name: string; englishName?: string; tags?: string; description: string; price: number; isAvailable: boolean; images: { url: string }[] };
 type Category = { id: string; name: string; englishName?: string; dishes: Dish[] };
@@ -65,14 +66,22 @@ export default function GuestMenuClient({ token }: { token: string }) {
       .then((d) => {
         if (cancelled) return;
         if (d.ok) {
-          setCategories(d.categories || []);
+          setCategories(
+            (d.categories || []).map((cat: Category) => ({
+              ...cat,
+              dishes: (cat.dishes || []).map((dish) => ({
+                ...dish,
+                images: (dish.images || []).map((img) => ({ ...img, url: normalizeUploadUrl(String(img.url || "")) })),
+              })),
+            })),
+          );
           setShowPrice(Boolean(d.showPrice));
           setInviteGuestName(String(d.inviteGuestName || ""));
           setWelcomeTemplate(d.welcomeTemplate || null);
           setUiConfig({
             guestTitle: d.uiConfig?.guestTitle || t("guest.brand.titleDefault"),
             guestSubtitle: d.uiConfig?.guestSubtitle || t("guest.brand.subtitleDefault"),
-            guestBannerUrl: d.uiConfig?.guestBannerUrl || "",
+            guestBannerUrl: normalizeUploadUrl(d.uiConfig?.guestBannerUrl || ""),
             welcomeAlwaysShow: Boolean(d.uiConfig?.welcomeAlwaysShow),
           });
           try {
@@ -411,7 +420,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
         <div className="relative mb-8 overflow-hidden rounded-3xl border border-amber-100/80 shadow-sm">
           {uiConfig.guestBannerUrl ? (
             <div className="absolute inset-0">
-              <Image src={uiConfig.guestBannerUrl} alt={t("guest.menu.bannerAlt")} fill sizes="100vw" loading="eager" className="object-cover" />
+              <VariantImage src={uiConfig.guestBannerUrl} alt={t("guest.menu.bannerAlt")} variant="large" fill sizes="100vw" loading="eager" className="object-cover" />
             </div>
           ) : (
             <div className="absolute inset-0 bg-gradient-to-r from-orange-100/70 via-amber-100/60 to-white" />
@@ -465,43 +474,54 @@ export default function GuestMenuClient({ token }: { token: string }) {
               }}
               className="scroll-mt-offset"
             >
-              <div className="mb-4 flex items-center gap-2 px-1">
-                <div className="h-6 w-1.5 rounded-full bg-orange-400" />
-                <h2 className="text-xl font-semibold tracking-tight text-stone-800">{displayCategoryName(cat)}</h2>
-                <span className="rounded-full bg-stone-100/70 px-2 py-0.5 text-xs font-medium text-stone-400">{cat.dishes.length}</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 md:gap-5 lg:grid-cols-3">
-                {cat.dishes.map((dish) => {
-                  const qty = cart[dish.id] || 0;
-                  const hasImage = Boolean(dish.images?.[0]?.url);
-                  return (
-                    <div key={dish.id} className="dish-card p-3">
-                      <button
-                        className="dish-img relative mb-3 aspect-square w-full overflow-hidden rounded-2xl"
-                        onClick={() => (hasImage ? setPreview({ url: dish.images[0].url, name: dish.name }) : null)}
-                        aria-label={t("guest.menu.previewImage")}
-                      >
-                        {hasImage ? <Image src={dish.images[0].url} alt={dish.name} fill sizes="50vw" className="object-cover" /> : null}
-                      </button>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <h3 className="truncate text-base font-bold text-stone-800">{dish.name}</h3>
-                          {dish.englishName ? <p className="truncate text-xs font-medium text-stone-500">{dish.englishName}</p> : null}
-                          <p className={`mt-0.5 text-sm font-semibold text-orange-500 ${showPrice ? "" : "invisible"}`}>¥{dish.price}</p>
-                        </div>
-                        <button
-                          className="rounded-xl bg-stone-800 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all duration-200 hover:bg-orange-600 disabled:opacity-40"
-                          disabled={!dish.isAvailable}
-                          onClick={() => add(dish.id)}
-                        >
-                          {dish.isAvailable ? (qty > 0 ? t("guest.menu.selected", { qty }) : t("guest.menu.add")) : t("guest.menu.soldOut")}
-                        </button>
-                      </div>
+              {(() => {
+                const shouldRenderImages = cat.id === currentCategoryId || cat.id === categories[0]?.id;
+                return (
+                  <>
+                    <div className="mb-4 flex items-center gap-2 px-1">
+                      <div className="h-6 w-1.5 rounded-full bg-orange-400" />
+                      <h2 className="text-xl font-semibold tracking-tight text-stone-800">{displayCategoryName(cat)}</h2>
+                      <span className="rounded-full bg-stone-100/70 px-2 py-0.5 text-xs font-medium text-stone-400">{cat.dishes.length}</span>
                     </div>
-                  );
-                })}
-              </div>
+
+                    <div className="grid grid-cols-2 gap-4 md:gap-5 lg:grid-cols-3">
+                      {cat.dishes.map((dish) => {
+                        const qty = cart[dish.id] || 0;
+                        const hasImage = shouldRenderImages && Boolean(dish.images?.[0]?.url);
+                        return (
+                          <div key={dish.id} className="dish-card p-3">
+                            <button
+                              className="dish-img relative mb-3 aspect-square w-full overflow-hidden rounded-2xl"
+                              onClick={() => (hasImage ? setPreview({ url: dish.images[0].url, name: dish.name }) : null)}
+                              aria-label={t("guest.menu.previewImage")}
+                            >
+                              {hasImage ? (
+                                <VariantImage src={dish.images[0].url} alt={dish.name} variant="small" fill sizes="50vw" className="object-cover" />
+                              ) : (
+                                <div className="h-full w-full bg-gradient-to-br from-orange-50 to-amber-50" />
+                              )}
+                            </button>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <h3 className="truncate text-base font-bold text-stone-800">{dish.name}</h3>
+                                {dish.englishName ? <p className="truncate text-xs font-medium text-stone-500">{dish.englishName}</p> : null}
+                                <p className={`mt-0.5 text-sm font-semibold text-orange-500 ${showPrice ? "" : "invisible"}`}>¥{dish.price}</p>
+                              </div>
+                              <button
+                                className="rounded-xl bg-stone-800 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all duration-200 hover:bg-orange-600 disabled:opacity-40"
+                                disabled={!dish.isAvailable}
+                                onClick={() => add(dish.id)}
+                              >
+                                {dish.isAvailable ? (qty > 0 ? t("guest.menu.selected", { qty }) : t("guest.menu.add")) : t("guest.menu.soldOut")}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           ))}
         </div>
@@ -556,7 +576,9 @@ export default function GuestMenuClient({ token }: { token: string }) {
               <div key={String(item.dish?.id)} className="rounded-3xl border border-amber-100/60 bg-white p-3">
                 <div className="flex items-center gap-3">
                   <div className="relative h-12 w-12 overflow-hidden rounded-2xl bg-orange-50">
-                    {item.dish?.images?.[0]?.url ? <Image src={item.dish.images[0].url} alt={item.dish.name} fill sizes="48px" className="object-cover" /> : null}
+                    {item.dish?.images?.[0]?.url ? (
+                      <VariantImage src={item.dish.images[0].url} alt={item.dish.name} variant="thumb" fill sizes="48px" className="object-cover" />
+                    ) : null}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold text-stone-800">{item.dish?.name}</p>
@@ -617,7 +639,7 @@ export default function GuestMenuClient({ token }: { token: string }) {
       {preview ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreview(null)}>
           <div className="max-w-xl rounded-xl bg-white p-2">
-            <Image src={preview.url} alt={preview.name} width={900} height={600} className="h-auto w-full rounded object-cover" />
+            <VariantImage src={preview.url} alt={preview.name} variant="large" width={900} height={600} className="h-auto w-full rounded object-cover" />
           </div>
         </div>
       ) : null}

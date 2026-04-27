@@ -359,7 +359,7 @@ export async function POST(req: NextRequest) {
               const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
               const target = path.join(publicUploadsDir, filename);
               await fs.writeFile(target, fileBytes, { flush: true });
-              restoredUrls.push(`/api/uploads/${encodeURIComponent(filename)}`);
+              restoredUrls.push(`/uploads/${encodeURIComponent(filename)}`);
               imageCount += 1;
               continue;
             }
@@ -369,7 +369,7 @@ export async function POST(req: NextRequest) {
               const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
               const target = path.join(publicUploadsDir, filename);
               await fs.writeFile(target, fileBytes, { flush: true });
-              restoredUrls.push(`/api/uploads/${encodeURIComponent(filename)}`);
+              restoredUrls.push(`/uploads/${encodeURIComponent(filename)}`);
               imageCount += 1;
             } else {
               missCount += 1;
@@ -382,7 +382,7 @@ export async function POST(req: NextRequest) {
           const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
           const target = path.join(publicUploadsDir, filename);
           await fs.writeFile(target, fileBytes, { flush: true });
-          restoredUrls.push(`/api/uploads/${encodeURIComponent(filename)}`);
+          restoredUrls.push(`/uploads/${encodeURIComponent(filename)}`);
           imageCount += 1;
         }
 
@@ -398,7 +398,7 @@ export async function POST(req: NextRequest) {
             const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`;
             const target = path.join(publicUploadsDir, filename);
             await fs.writeFile(target, fileBytes, { flush: true });
-            restoredUrls.push(`/api/uploads/${encodeURIComponent(filename)}`);
+            restoredUrls.push(`/uploads/${encodeURIComponent(filename)}`);
             imageCount += 1;
           }
         }

@@ -1,4 +1,5 @@
 import { ensureAdmin } from "@/lib/api-auth";
+import { normalizeUploadUrl } from "@/lib/image-variants";
 import { logInfo, logWarn } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
@@ -15,7 +16,13 @@ export async function GET(req: NextRequest) {
     orderBy: { createdAt: "desc" },
     include: { category: true, images: true },
   });
-  return NextResponse.json({ ok: true, data });
+  return NextResponse.json({
+    ok: true,
+    data: data.map((dish) => ({
+      ...dish,
+      images: (dish.images || []).map((img) => ({ ...img, url: normalizeUploadUrl(img.url) })),
+    })),
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -83,7 +90,7 @@ export async function POST(req: NextRequest) {
         categoryId: body.categoryId,
         isPublished: true,
         isAvailable: true,
-        images: body.imageUrl ? { create: [{ url: body.imageUrl, isCover: true }] } : undefined,
+        images: body.imageUrl ? { create: [{ url: normalizeUploadUrl(body.imageUrl), isCover: true }] } : undefined,
       },
     });
     return NextResponse.json({ ok: true, data });
@@ -98,7 +105,7 @@ export async function PUT(req: NextRequest) {
   const body = await req.json();
   if (body.imageAction === "replace" && body.imageUrl) {
     await prisma.dishImage.deleteMany({ where: { dishId: body.id } });
-    await prisma.dishImage.create({ data: { dishId: body.id, url: body.imageUrl, isCover: true } });
+    await prisma.dishImage.create({ data: { dishId: body.id, url: normalizeUploadUrl(body.imageUrl), isCover: true } });
   }
   const data = await prisma.dish.update({
     where: { id: body.id },

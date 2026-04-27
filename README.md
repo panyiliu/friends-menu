@@ -111,6 +111,27 @@ npm run start:prod
 - 备份目录需包含：`dev.db` 和 `uploads/`
 - 恢复前会自动保存当前快照到 `backup-before-restore/时间戳`
 
+## 图片性能优化（阶段一/二）
+
+- 新上传图片默认使用静态路径：`/uploads/<file>`（不再新增 `/api/uploads/*`）。
+- 历史数据迁移命令：`npm run migrate:image-urls`
+- 为兼容历史外链，`/api/uploads/*` 仍可访问，但会 308 重定向到 `/uploads/*`。
+- 上传后会自动生成多尺寸与现代格式派生图（`thumb/small/medium/large` 的 `webp/avif`），前端会优先加载派生图并自动回退原图。
+
+### 图片链路验证命令
+
+```bash
+# 1) 迁移历史 URL（幂等，可重复执行）
+npm run migrate:image-urls
+
+# 2) 对比 API 兼容路径和静态路径延迟（示例）
+curl -I http://127.0.0.1:3000/api/uploads/<filename>
+curl -I http://127.0.0.1:3000/uploads/<filename>
+
+# 3) 验证静态缓存头（应看到 ETag / Last-Modified）
+curl -I http://127.0.0.1:3000/uploads/<filename>
+```
+
 ## 压测脚本（10-30人）
 
 - 命令：`npm run stress:test -- <token> [count] [baseUrl]`
@@ -199,6 +220,8 @@ AUTO_SEED_IF_EMPTY=true
 
 说明：
 - 生产模式下会启用 `ADMIN_SESSION_SECRET` 的安全校验（避免默认值/过短密钥）。
+- Compose 已内置 `watchtower`，只会更新带 `com.centurylinklabs.watchtower.enable=true` 标签的容器（当前即 `app`）。
+- 默认每 300 秒检查一次镜像更新，可通过 `.env` 中 `WATCHTOWER_POLL_INTERVAL` 调整。
 
 ### 常用命令
 

@@ -28,9 +28,8 @@ const nextConfig: NextConfig = {
     return config;
   },
   images: {
-    // Use original files directly. This avoids _next/image 400 errors
-    // in LAN/Docker deployments when optimizer cannot decode some uploads.
-    unoptimized: true,
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 300,
   },
 };
 

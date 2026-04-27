@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { normalizeUploadUrl } from "@/lib/image-variants";
 
 export async function GET(_: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -24,7 +25,18 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
       },
     },
   });
-  const categories = categoriesRaw.filter((c) => (c.dishes || []).length > 0);
+  const categories = categoriesRaw
+    .filter((c) => (c.dishes || []).length > 0)
+    .map((c) => ({
+      ...c,
+      dishes: (c.dishes || []).map((dish) => ({
+        ...dish,
+        images: (dish.images || []).map((img) => ({
+          ...img,
+          url: normalizeUploadUrl(String(img.url || "")),
+        })),
+      })),
+    }));
 
   const availableTags = [
     ...new Set(
@@ -58,7 +70,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ token: str
     uiConfig: {
       guestTitle: setting?.guestTitle || "朋友·聚",
       guestSubtitle: setting?.guestSubtitle || "欢聚时刻 · 臻选风味",
-      guestBannerUrl: setting?.guestBannerUrl || "",
+      guestBannerUrl: normalizeUploadUrl(setting?.guestBannerUrl || ""),
       welcomeAlwaysShow: Boolean(setting?.welcomeAlwaysShow),
     },
   });

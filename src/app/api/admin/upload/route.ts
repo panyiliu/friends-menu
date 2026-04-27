@@ -3,6 +3,14 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { NextRequest, NextResponse } from "next/server";
 import { imageSize } from "image-size";
+import { buildVariantUrl } from "@/lib/image-variants";
+
+const DERIVATIVE_SIZES = {
+  thumb: 160,
+  small: 480,
+  medium: 960,
+  large: 1440,
+} as const;
 
 function sanitizeBaseName(name: string) {
   return String(name || "")
@@ -50,7 +58,47 @@ export async function POST(req: NextRequest) {
     }
 
     await writeFile(path.join(uploadDir, name), buffer, { flush: true });
-    return NextResponse.json({ ok: true, url: `/api/uploads/${encodeURIComponent(name)}` });
+    const staticUrl = `/uploads/${encodeURIComponent(name)}`;
+
+    // Generate optimized derivative files for list/detail contexts.
+    try {
+      const sharpModule = await import("sharp");
+      const sharp = sharpModule.default;
+      const baseImage = sharp(buffer, { failOn: "none" }).rotate();
+      const jobs: Promise<unknown>[] = [];
+      for (const [sizeName, width] of Object.entries(DERIVATIVE_SIZES) as Array<[keyof typeof DERIVATIVE_SIZES, number]>) {
+        const webpUrl = buildVariantUrl(staticUrl, sizeName, "webp");
+        const avifUrl = buildVariantUrl(staticUrl, sizeName, "avif");
+        jobs.push(
+          baseImage
+            .clone()
+            .resize({ width, fit: "inside", withoutEnlargement: true })
+            .webp({ quality: 82, effort: 4 })
+            .toFile(path.join(process.cwd(), "public", decodeURIComponent(webpUrl.slice(1)))),
+        );
+        jobs.push(
+          baseImage
+            .clone()
+            .resize({ width, fit: "inside", withoutEnlargement: true })
+            .avif({ quality: 52, effort: 4 })
+            .toFile(path.join(process.cwd(), "public", decodeURIComponent(avifUrl.slice(1)))),
+        );
+      }
+      await Promise.allSettled(jobs);
+    } catch {
+      // Do not block upload flow if derivative generation fails.
+    }
+
+    return NextResponse.json({
+      ok: true,
+      url: staticUrl,
+      variants: {
+        thumb: { webp: buildVariantUrl(staticUrl, "thumb", "webp"), avif: buildVariantUrl(staticUrl, "thumb", "avif") },
+        small: { webp: buildVariantUrl(staticUrl, "small", "webp"), avif: buildVariantUrl(staticUrl, "small", "avif") },
+        medium: { webp: buildVariantUrl(staticUrl, "medium", "webp"), avif: buildVariantUrl(staticUrl, "medium", "avif") },
+        large: { webp: buildVariantUrl(staticUrl, "large", "webp"), avif: buildVariantUrl(staticUrl, "large", "avif") },
+      },
+    });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "上传失败";
     return NextResponse.json({ ok: false, message: `上传失败：${msg}` }, { status: 500 });
