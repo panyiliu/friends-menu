@@ -5,9 +5,9 @@ services:
       args:
         GIT_SHA: ${GIT_SHA:-unknown}
         BUILD_TIME: ${BUILD_TIME:-}
-    container_name: ${CONTAINER_NAME:-friends-menu}
+    container_name: friends-menu
     ports:
-      - "${HOST_PORT:-3000}:3000"
+      - "3000:3000"
     environment:
       - DATABASE_URL=file:/app/prisma/dev.db
       # NOTE: ADMIN_SESSION_SECRET 由 entrypoint 自动生成（避免用户必须创建 .env）
@@ -44,14 +44,14 @@ services:
 
   watchtower:
     image: containrrr/watchtower:latest
-    container_name: ${WATCHTOWER_CONTAINER_NAME:-friends-menu-watchtower}
+    container_name: friends-menu-watchtower
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - WATCHTOWER_CLEANUP=true
       - WATCHTOWER_LABEL_ENABLE=true
-      - WATCHTOWER_POLL_INTERVAL=${WATCHTOWER_POLL_INTERVAL:-300}
+      - WATCHTOWER_POLL_INTERVAL=300
       - WATCHTOWER_NO_STARTUP_MESSAGE=true
     command: --label-enable
 

@@ -169,7 +169,7 @@ git clone https://github.com/<你的用户名>/<仓库名>.git friends-menu
 cd friends-menu
 ```
 
-（可选）如需覆盖端口，可创建 `.env`；不创建也能启动（`ADMIN_SESSION_SECRET` 会自动生成并持久化）。
+当前 compose 已采用固定 YAML 配置（端口 `3000:3000`、容器名固定）；如需改端口请直接改 `docker-compose*.yml`。
 
 ```bash
 docker compose up -d --build
@@ -181,7 +181,7 @@ docker compose up -d --build
 
 普通用户默认不需要手动再执行 migrate/seed。若想禁用自动 seed，可设置环境变量 `AUTO_SEED_IF_EMPTY=false`（可选通过 `.env`）。
 
-浏览器访问 **`http://<服务器IP>:<HOST_PORT>`**（默认 3000），后台 **`/admin/login`**，默认账号见上文「默认账号」。
+浏览器访问 **`http://<服务器IP>:3000`**，后台 **`/admin/login`**，默认账号见上文「默认账号」。
 
 升级新版本：在同一目录 **`git pull`** 后执行 **`docker compose up -d --build`**。数据仍在 named volumes 中。
 
@@ -191,7 +191,7 @@ docker compose up -d --build
 docker compose up -d --build
 ```
 
-访问：`http://<服务器IP>:<HOST_PORT>`（默认 3000）
+访问：`http://<服务器IP>:3000`
 
 ### 说明
 
@@ -221,7 +221,7 @@ AUTO_SEED_IF_EMPTY=true
 说明：
 - 生产模式下会启用 `ADMIN_SESSION_SECRET` 的安全校验（避免默认值/过短密钥）。
 - Compose 已内置 `watchtower`，只会更新带 `com.centurylinklabs.watchtower.enable=true` 标签的容器（当前即 `app`）。
-- 默认每 300 秒检查一次镜像更新，可通过 `.env` 中 `WATCHTOWER_POLL_INTERVAL` 调整。
+- 默认每 300 秒检查一次镜像更新；如需调整请直接修改 `docker-compose*.yml` 中 `WATCHTOWER_POLL_INTERVAL`。
 
 ### 常用命令
 
